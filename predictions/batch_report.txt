@@ -1,0 +1,136 @@
+============================================================
+ANOMALY DETECTION REPORT
+============================================================
+
+Timestamp: 2026-03-16 01:22:23
+Model Type: single
+
+SUMMARY:
+----------------------------------------
+  Total events analyzed:  100
+  Anomalies detected:     11
+  Normal events:          89
+  Anomaly rate:           11.0%
+
+SEVERITY BREAKDOWN:
+----------------------------------------
+  CRITICAL  : 6
+  HIGH      : 5
+  MEDIUM    : 10
+  LOW       : 0
+  NORMAL    : 79
+
+ANOMALY DETAILS:
+----------------------------------------
+
+  Event #1:
+    Score:    -0.497062
+    Severity: HIGH
+    Summary:  Anomaly detected. Top contributing factors: ui_response_ms_rolling_std_5, ui_response_ms_rolling_max_10, latency_cv
+    Action:   Investigate API performance. Check: 1) Backend server load, 2) Database query performance, 3) Network connectivity, 4) Third-party API response times.
+    Top Contributing Features:
+      - ui_response_ms_rolling_std_5: value=6.1154, z-score=6.06, direction=HIGH
+      - ui_response_ms_rolling_max_10: value=3.7023, z-score=3.67, direction=HIGH
+      - latency_cv: value=3.2008, z-score=3.39, direction=HIGH
+
+  Event #20:
+    Score:    -0.529355
+    Severity: CRITICAL
+    Summary:  Anomaly detected. Top contributing factors: memory_mb, memory_mb_rolling_mean_5, memory_mb_rolling_max_10
+    Action:   Possible memory leak detected. Check: 1) Memory-intensive operations, 2) Unclosed resources/connections, 3) Cache sizes, 4) Recent code deployments.
+    Top Contributing Features:
+      - memory_mb: value=3.7216, z-score=6.39, direction=HIGH
+      - memory_mb_rolling_mean_5: value=3.3887, z-score=5.03, direction=HIGH
+      - memory_mb_rolling_max_10: value=2.9883, z-score=3.82, direction=HIGH
+
+  Event #25:
+    Score:    -0.506042
+    Severity: CRITICAL
+    Summary:  Anomaly detected. Top contributing factors: ui_response_ms, latency_change_rate, memory_mb_rolling_mean_5
+    Action:   Investigate API performance. Check: 1) Backend server load, 2) Database query performance, 3) Network connectivity, 4) Third-party API response times.
+    Top Contributing Features:
+      - ui_response_ms: value=2.7496, z-score=2.97, direction=HIGH
+      - latency_change_rate: value=1.3788, z-score=2.85, direction=HIGH
+      - memory_mb_rolling_mean_5: value=1.6272, z-score=2.52, direction=HIGH
+
+  Event #28:
+    Score:    -0.609933
+    Severity: CRITICAL
+    Summary:  Anomaly detected. Top contributing factors: api_latency_ms_rolling_mean_5, api_latency_ms, fps
+    Action:   Investigate API performance. Check: 1) Backend server load, 2) Database query performance, 3) Network connectivity, 4) Third-party API response times.
+    Top Contributing Features:
+      - api_latency_ms_rolling_mean_5: value=2.9741, z-score=7.19, direction=HIGH
+      - api_latency_ms: value=1.1836, z-score=6.94, direction=HIGH
+      - fps: value=-2.6673, z-score=3.43, direction=LOW
+
+  Event #52:
+    Score:    -0.47983
+    Severity: HIGH
+    Summary:  Anomaly detected. Top contributing factors: api_latency_ms, ui_response_ms, ui_response_ms_rolling_mean_5
+    Action:   Investigate API performance. Check: 1) Backend server load, 2) Database query performance, 3) Network connectivity, 4) Third-party API response times.
+    Top Contributing Features:
+      - api_latency_ms: value=0.8114, z-score=5.0, direction=HIGH
+      - ui_response_ms: value=4.5945, z-score=4.92, direction=HIGH
+      - ui_response_ms_rolling_mean_5: value=4.5381, z-score=4.48, direction=HIGH
+
+  Event #59:
+    Score:    -0.500225
+    Severity: HIGH
+    Summary:  Anomaly detected. Top contributing factors: memory_mb_rolling_std_5, memory_mb, memory_growth_rate
+    Action:   Possible memory leak detected. Check: 1) Memory-intensive operations, 2) Unclosed resources/connections, 3) Cache sizes, 4) Recent code deployments.
+    Top Contributing Features:
+      - memory_mb_rolling_std_5: value=3.3961, z-score=4.02, direction=HIGH
+      - memory_mb: value=1.7493, z-score=3.16, direction=HIGH
+      - memory_growth_rate: value=2.8268, z-score=2.97, direction=HIGH
+
+  Event #61:
+    Score:    -0.565419
+    Severity: CRITICAL
+    Summary:  Anomaly detected. Top contributing factors: memory_growth_rate, memory_mb_rolling_std_5, memory_mb_rolling_mean_5
+    Action:   Investigate API performance. Check: 1) Backend server load, 2) Database query performance, 3) Network connectivity, 4) Third-party API response times.
+    Top Contributing Features:
+      - memory_growth_rate: value=-9.6419, z-score=9.93, direction=LOW
+      - memory_mb_rolling_std_5: value=5.5834, z-score=6.55, direction=HIGH
+      - memory_mb_rolling_mean_5: value=3.6802, z-score=5.44, direction=HIGH
+
+  Event #62:
+    Score:    -0.498572
+    Severity: HIGH
+    Summary:  Anomaly detected. Top contributing factors: recent_error_count, api_latency_ms
+    Action:   Investigate API performance. Check: 1) Backend server load, 2) Database query performance, 3) Network connectivity, 4) Third-party API response times.
+    Top Contributing Features:
+      - recent_error_count: value=4.9589, z-score=12.36, direction=HIGH
+      - api_latency_ms: value=0.456, z-score=3.14, direction=HIGH
+
+  Event #66:
+    Score:    -0.506791
+    Severity: CRITICAL
+    Summary:  Anomaly detected. Top contributing factors: fps, fps_rolling_mean_5, fps_change_rate
+    Action:   UI performance degradation detected. Check: 1) Heavy UI rendering operations, 2) Main thread blocking, 3) Animations/transitions, 4) Device-specific issues.
+    Top Contributing Features:
+      - fps: value=-3.7122, z-score=4.69, direction=LOW
+      - fps_rolling_mean_5: value=-3.0456, z-score=3.38, direction=LOW
+      - fps_change_rate: value=-2.4574, z-score=2.56, direction=LOW
+
+  Event #76:
+    Score:    -0.501
+    Severity: HIGH
+    Summary:  Anomaly detected. Top contributing factors: recent_error_count, api_latency_ms
+    Action:   Investigate API performance. Check: 1) Backend server load, 2) Database query performance, 3) Network connectivity, 4) Third-party API response times.
+    Top Contributing Features:
+      - recent_error_count: value=4.9589, z-score=12.36, direction=HIGH
+      - api_latency_ms: value=0.2955, z-score=2.31, direction=HIGH
+
+  Event #77:
+    Score:    -0.571255
+    Severity: CRITICAL
+    Summary:  Anomaly detected. Top contributing factors: api_latency_ms, latency_cv, api_latency_ms_rolling_std_5
+    Action:   Investigate API performance. Check: 1) Backend server load, 2) Database query performance, 3) Network connectivity, 4) Third-party API response times.
+    Top Contributing Features:
+      - api_latency_ms: value=2.2755, z-score=12.63, direction=HIGH
+      - latency_cv: value=2.7908, z-score=2.96, direction=HIGH
+      - api_latency_ms_rolling_std_5: value=1.9947, z-score=2.92, direction=HIGH
+
+============================================================
+END OF REPORT
+============================================================
