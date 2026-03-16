@@ -158,8 +158,3 @@ streamlit run app/streamlit_app.py  # Launch dashboard
 
 **Ashhar Ali**
 
----
-
-## 📄 License
-
-MIT License — see [LICENSE](LICENSE) for details.
