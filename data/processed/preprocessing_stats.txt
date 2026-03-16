@@ -1,0 +1,10 @@
+PREPROCESSING STATISTICS
+============================================================
+
+total_events: 10000
+date_range: ('2026-02-19 16:13:40.224973', '2026-02-22 15:56:44.224973')
+n_features: 29
+train_size: 8000
+test_size: 2000
+train_anomaly_rate: 0.12325
+test_anomaly_rate: 0.1025

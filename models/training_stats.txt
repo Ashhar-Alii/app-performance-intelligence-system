@@ -1,0 +1,41 @@
+MODEL TRAINING STATISTICS (IMPROVED)
+============================================================
+
+Training Date: 2026-03-15 02:00:48
+
+MODEL CONFIGURATION:
+----------------------------------------
+  Algorithm: Isolation Forest Single
+  n_estimators: 200
+  max_samples: 1.0
+  max_features: 1.0
+  training_data: normal_only
+  optimal_threshold: -0.477327
+  features_used: 29
+
+PERFORMANCE METRICS:
+----------------------------------------
+  n_features_original: 29
+  train_size: 8000
+  test_size: 2000
+  train_anomaly_rate: 0.12325
+  baseline_train_precision: 0.23768844221105528
+  baseline_train_recall: 0.9594320486815415
+  baseline_train_f1: 0.3809907370116794
+  best_params: {'n_estimators': 200, 'max_samples': 1.0, 'max_features': 1.0, 'training_data': 'normal_only'}
+  grid_search_total: 36
+  ensemble_size: 3
+  iforest_train_precision: 0.6241379310344828
+  iforest_train_recall: 0.7342799188640974
+  iforest_train_f1: 0.6747437092264679
+  iforest_train_auc: 0.9293360540582122
+  optimal_threshold: -0.4773269897452671
+  use_ensemble: False
+  n_features_used: 29
+  baseline_test_precision: 0.2065677966101695
+  baseline_test_recall: 0.9512195121951219
+  baseline_test_f1: 0.3394255874673629
+  iforest_test_precision: 0.5720164609053497
+  iforest_test_recall: 0.6780487804878049
+  iforest_test_f1: 0.6205357142857143
+  iforest_test_auc_roc: 0.9169182689041375
