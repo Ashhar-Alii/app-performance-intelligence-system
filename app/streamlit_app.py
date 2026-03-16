@@ -227,8 +227,7 @@ with st.sidebar:
         st.session_state.explainer_config != current_config):
         explainer = AIExplainer(
             provider=ai_provider,
-            api_key=user_api_key if user_api_key else None,
-            use_system_key=True
+            api_key=user_api_key if user_api_key else None
         )
         st.session_state.explainer = explainer
         st.session_state.explainer_config = current_config
@@ -251,18 +250,28 @@ with st.sidebar:
     
     if ai_status.get('rate_limited'):
         st.warning(ai_status['status'])
-        st.caption("💡 Enter your own API key above OR use Rule-Based mode")
+        st.caption("💡 Enter your own API key above OR switch to Rule-Based")
     elif ai_status.get('validated'):
         st.success(ai_status['status'])
     elif ai_status.get('llm_available'):
         st.info(ai_status['status'])
-    elif ai_status.get('error'):
-        st.error(ai_status['status'])
-        st.caption(f"❌ {ai_status['error']}")
     elif ai_provider == 'rule_based':
         st.info(ai_status['status'])
+    elif ai_status.get('error'):
+        st.error(ai_status['status'])
+        if 'No API key' in ai_status.get('error', ''):
+            if ai_provider == 'gemini':
+                st.caption("💡 Add GEMINI_API_KEY to .streamlit/secrets.toml or enter manually above")
+            elif ai_provider == 'groq':
+                st.caption("💡 Add GROQ_API_KEY to .streamlit/secrets.toml or enter manually above")
+        else:
+            st.caption(f"❌ {ai_status['error']}")
     else:
-        st.warning("⚠️ No API key available")
+        st.warning("⚠️ No API key configured")
+        if ai_provider == 'gemini':
+            st.caption("Add GEMINI_API_KEY to .streamlit/secrets.toml")
+        elif ai_provider == 'groq':
+            st.caption("Add GROQ_API_KEY to .streamlit/secrets.toml")
     
     # ── Model Info ──
     st.markdown("### 📊 Model Info")
@@ -442,31 +451,49 @@ if st.session_state.current_result:
         
         with st.expander(f"{icon} AI Root Cause Analysis", expanded=is_anomaly):
             
+            # Get current provider selection from sidebar
+            selected_provider = st.session_state.get('ai_provider_select', 'rule_based')
+            llm_error = explanation.get('llm_error', '')
+            
             if explanation['provider'] in ['gemini', 'groq']:
+                # LLM worked successfully
                 st.markdown(f"""
                 <div style="background: #E8F5E9; border-left: 4px solid #4CAF50; 
                             padding: 0.5rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 1rem;">
                     <b>✅ Powered by: {provider_display}</b> — Live AI Analysis
                 </div>
                 """, unsafe_allow_html=True)
+            
+            elif selected_provider != 'rule_based' and llm_error:
+                # User wanted LLM but it failed — show WHY
+                st.markdown(f"""
+                <div style="background: #FFF3E0; border-left: 4px solid #FF9800; 
+                            padding: 0.5rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 1rem;">
+                    <b>⚠️ Powered by: {provider_display}</b> — LLM unavailable, using fallback
+                    <br><small style="color: #666;">Reason: {llm_error}</small>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            elif selected_provider != 'rule_based':
+                # User selected LLM but no error recorded
+                provider_name = 'Groq' if selected_provider == 'groq' else 'Gemini'
+                st.markdown(f"""
+                <div style="background: #FFF3E0; border-left: 4px solid #FF9800; 
+                            padding: 0.5rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 1rem;">
+                    <b>⚠️ Powered by: {provider_display}</b>
+                    <br><small style="color: #666;">💡 Click "Test Connection" in sidebar first, then generate again</small>
+                </div>
+                """, unsafe_allow_html=True)
+            
             else:
-                # Check if LLM was supposed to be used but failed
-                if hasattr(explainer, 'validation_attempted') and explainer.validation_attempted and not explainer.validated:
-                    st.markdown(f"""
-                    <div style="background: #FFF3E0; border-left: 4px solid #FF9800; 
-                                padding: 0.5rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 1rem;">
-                        <b>⚠️ Powered by: {provider_display}</b> — LLM failed, using fallback
-                        <br><small style="color: #666;">Error: {explainer.error_message}</small>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div style="background: #E3F2FD; border-left: 4px solid #2196F3; 
-                                padding: 0.5rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 1rem;">
-                        <b>Powered by: {provider_display}</b>
-                        <br><small style="color: #666;">💡 Add a Gemini API key in sidebar for AI-powered insights</small>
-                    </div>
-                    """, unsafe_allow_html=True)
+                # User chose rule-based intentionally
+                st.markdown(f"""
+                <div style="background: #E3F2FD; border-left: 4px solid #2196F3; 
+                            padding: 0.5rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 1rem;">
+                    <b>Powered by: {provider_display}</b>
+                    <br><small style="color: #666;">💡 Select Groq or Gemini in sidebar for AI-powered insights</small>
+                </div>
+                """, unsafe_allow_html=True)
             
             if is_anomaly:
                 st.markdown("#### 🔍 Root Cause")

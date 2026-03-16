@@ -22,16 +22,81 @@ class AIExplainer:
     
     def __init__(self, provider='rule_based', api_key=None):
         self.provider = provider
-        self.api_key = api_key
+        self.manual_key = api_key
+        self.active_key = None
+        self.using_system_key = False
         self.llm_available = False
         self.model = None
         self.error_message = ""
         self.validated = False
         self.validation_attempted = False
-        self.last_call_time = 0                                        # ← NEW: rate limit tracking
-        self.min_call_interval = 4.0                                   # ← NEW: minimum seconds between calls
+        self.rate_limited = False
+        self.last_call_time = 0
+        self.min_call_interval = 2.0
         
+        # Resolve which key to use
+        self._resolve_api_key()
         self._setup_llm()
+
+    def _resolve_api_key(self):
+        """
+        Determine which API key to use.
+        
+        Priority:
+        1. Manual key (user typed in sidebar)
+        2. System key (from .streamlit/secrets.toml or environment)
+        3. No key → rule-based
+        """
+        # Priority 1: User's manual key
+        if self.manual_key and len(self.manual_key.strip()) > 10:
+            self.active_key = self.manual_key.strip()
+            self.using_system_key = False
+            return
+        
+        # Priority 2: System key
+        system_key = self._get_system_key()
+        if system_key:
+            self.active_key = system_key
+            self.using_system_key = True
+            return
+        
+        # Priority 3: No key
+        self.active_key = None
+
+    def _get_system_key(self):
+        """
+        Get API key from environment.
+        
+        Checks:
+        1. Streamlit secrets (.streamlit/secrets.toml)
+        2. OS environment variable
+        """
+        import streamlit as st
+        
+        key = None
+        
+        # Try Streamlit secrets
+        try:
+            if self.provider == 'groq':
+                key = st.secrets.get("GROQ_API_KEY", None)
+            elif self.provider == 'gemini':
+                key = st.secrets.get("GEMINI_API_KEY", None)
+        except Exception:
+            pass
+        
+        # Try OS environment variable
+        if not key:
+            if self.provider == 'groq':
+                key = os.environ.get("GROQ_API_KEY", None)
+            elif self.provider == 'gemini':
+                key = os.environ.get("GEMINI_API_KEY", None)
+        
+        if key and len(str(key).strip()) > 10:
+            return str(key).strip()
+        
+        return None
+    
+        # REPLACE WITH THIS:
     
     def _setup_llm(self):
         """Setup LLM without making a test call."""
@@ -39,18 +104,19 @@ class AIExplainer:
         self.error_message = ""
         self.validated = False
         self.validation_attempted = False
+        self.rate_limited = False
         
         if self.provider == 'rule_based':
             return
         
-        if not self.api_key or len(self.api_key.strip()) < 10:
-            self.error_message = "No API key provided"
+        if not self.active_key:                                       # ← FIXED
+            self.error_message = "No API key available"
             return
         
         if self.provider == 'gemini':
             try:
                 import google.generativeai as genai
-                genai.configure(api_key=self.api_key.strip())
+                genai.configure(api_key=self.active_key)              # ← FIXED
                 self.model = genai.GenerativeModel('gemini-1.5-flash')
                 self.llm_available = True
             except ImportError:
@@ -61,7 +127,7 @@ class AIExplainer:
         elif self.provider == 'groq':
             try:
                 from groq import Groq
-                self.model = Groq(api_key=self.api_key.strip())
+                self.model = Groq(api_key=self.active_key)            # ← FIXED
                 self.llm_available = True
             except ImportError:
                 self.error_message = "Run: pip install groq"
@@ -153,62 +219,67 @@ class AIExplainer:
             return {'valid': False, 'message': self.error_message}
     
     def explain(self, prediction_result, event_data=None, use_llm=True):
-        """
-        Generate explanation for a prediction.
-        
-        Args:
-            prediction_result: Model prediction output
-            event_data: Original event data
-            use_llm: Whether to try LLM (set False for batch to save quota)
-                     ← NEW PARAMETER
-        """
+        """Generate explanation for a prediction."""
         if not prediction_result['is_anomaly']:
             return {
                 'explanation': '✅ All system metrics are within normal operating ranges.',
                 'root_cause': 'N/A - System operating normally',
                 'impact': 'No impact - Normal operation',
                 'recommendation': 'Continue monitoring. No action required.',
-                'provider': 'rule_based'
+                'provider': 'rule_based',
+                'llm_error': ''                                        # ← NEW
             }
         
-        # ← FIX: If use_llm is False, skip LLM entirely (for batch mode)
         if not use_llm:
-            return self._rule_based_explain(prediction_result, event_data)
+            result = self._rule_based_explain(prediction_result, event_data)
+            result['llm_error'] = 'Batch mode - rule-based used to save API quota'
+            return result
         
-        # ← FIX: Rate limit protection
+        if self.rate_limited:
+            result = self._rule_based_explain(prediction_result, event_data)
+            result['llm_error'] = 'Rate limit reached - using rule-based'
+            return result
+        
         if self.llm_available and self.model is not None:
             time_since_last = time.time() - self.last_call_time
             
             if time_since_last < self.min_call_interval:
-                # Too soon since last call — use rules instead
-                return self._rule_based_explain(prediction_result, event_data)
+                result = self._rule_based_explain(prediction_result, event_data)
+                result['llm_error'] = f'Rate protection - wait {self.min_call_interval}s between calls'
+                return result
             
             try:
                 result = self._llm_explain(prediction_result, event_data)
                 self.validated = True
                 self.validation_attempted = True
                 self.error_message = ""
-                self.last_call_time = time.time()                      # ← Track call time
+                self.rate_limited = False
+                self.last_call_time = time.time()
+                result['llm_error'] = ''                               # ← No error
                 return result
             except Exception as e:
                 self.validation_attempted = True
                 error_str = str(e).lower()
                 
-                if 'api_key' in error_str or 'invalid' in error_str or 'authenticate' in error_str:
+                if 'api_key' in error_str or 'invalid' in error_str or 'auth' in error_str:
                     self.error_message = "Invalid API key"
                     self.llm_available = False
                     self.validated = False
                 elif 'quota' in error_str or 'rate' in error_str or '429' in error_str:
-                    self.error_message = "Rate limit. Using rule-based for now."
-                    # DON'T disable llm_available — just temporary rate limit
+                    self.error_message = "Rate limit reached"
+                    self.rate_limited = True
                 elif 'blocked' in error_str or 'safety' in error_str:
-                    self.error_message = "Content filtered. Using rule-based."
+                    self.error_message = "Content filtered by safety"
                 else:
                     self.error_message = f"LLM error: {str(e)[:100]}"
                 
-                return self._rule_based_explain(prediction_result, event_data)
+                result = self._rule_based_explain(prediction_result, event_data)
+                result['llm_error'] = self.error_message               # ← Track WHY it failed
+                return result
         else:
-            return self._rule_based_explain(prediction_result, event_data)
+            result = self._rule_based_explain(prediction_result, event_data)
+            result['llm_error'] = self.error_message or 'LLM not available'
+            return result
     
     def _build_prompt(self, prediction_result, event_data=None):
         """Build prompt for the LLM."""
@@ -389,7 +460,8 @@ RECOMMENDATION: Two to three specific actions to fix this."""
             'root_cause': root_cause,
             'impact': impact,
             'recommendation': recommendation,
-            'provider': 'rule_based'
+            'provider': 'rule_based',
+            'llm_error': ''
         }
     
     def get_status(self):
