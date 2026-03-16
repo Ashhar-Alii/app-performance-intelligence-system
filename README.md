@@ -19,7 +19,7 @@ Detects anomalies in mobile app telemetry (API latency, FPS, memory, errors) usi
 
 ## 🏗️ Pipeline
 
-![Pipeline](assets/pipeline.png)
+![Pipeline](assets/Pipeline.png)
 
 ---
 
