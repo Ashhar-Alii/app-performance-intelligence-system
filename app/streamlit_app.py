@@ -194,13 +194,13 @@ with st.sidebar:
         # ── AI Explainer Config ──
     st.markdown("### 🤖 AI Explainer")
     
+        # REPLACE WITH:
     ai_provider = st.selectbox(
         "Provider",
-        ['groq', 'gemini', 'rule_based'],
+        ['groq', 'rule_based'],
         format_func=lambda x: {
             'rule_based': '📝 Rule-Based (No API needed)',
-            'gemini': '🌟 Google Gemini',
-            'groq': '⚡ Groq (Recommended)'
+            'groq': '⚡ Groq AI (Recommended)'
         }[x],
         key='ai_provider_select'
     )
@@ -518,6 +518,82 @@ if st.session_state.current_result:
                         for f in contributions
                     ])
                     st.dataframe(contrib_df, use_container_width=True, hide_index=True)
+                
+                if is_anomaly and st.session_state.current_result.get('contributions'):
+                    
+                    # ── Causal Chain ──
+                    st.markdown("#### 🔗 Root Cause Chain")
+                    st.markdown("*Tracing the anomaly back to its source:*")
+                    
+                    causal_chain = explainer._build_causal_chain(
+                        st.session_state.current_result['contributions']
+                    )
+                    
+                    if causal_chain:
+                        for step in causal_chain:
+                            if step['step'] == len(causal_chain):
+                                icon = "🔴"
+                            elif step['step'] == 1:
+                                icon = "⚡"
+                            else:
+                                icon = "→"
+                            
+                            st.markdown(
+                                f"**{icon} Step {step['step']}** ({step['component']}): "
+                                f"{step['event']}"
+                            )
+                    
+                    # ── What-If Recovery Simulation ──
+                    st.markdown("#### 🔮 Recovery Simulation")
+                    st.markdown("*Projected metrics if recommended actions are taken:*")
+                    
+                    recovery = explainer._simulate_recovery(
+                        st.session_state.current_result
+                    )
+                    
+                    if recovery:
+                        rec_col1, rec_col2, rec_col3 = st.columns(3)
+                        
+                        rec_col1.metric(
+                            "📈 Expected Improvement",
+                            f"{recovery['improvement_percent']}%",
+                            "metric recovery"
+                        )
+                        rec_col2.metric(
+                            "⏱️ Est. Recovery Time",
+                            recovery['estimated_recovery_time']
+                        )
+                        rec_col3.metric(
+                            "🎯 Confidence",
+                            recovery['confidence']
+                        )
+                        
+                        # Before/After comparison
+                        import plotly.graph_objects as go
+                        
+                        features = list(recovery['current_state'].keys())
+                        current_vals = list(recovery['current_state'].values())
+                        recovered_vals = list(recovery['recovered_state'].values())
+                        
+                        fig = go.Figure(data=[
+                            go.Bar(name='Current (Anomalous)', 
+                                   x=features, y=current_vals,
+                                   marker_color='#FF4B4B'),
+                            go.Bar(name='After Fix (Projected)', 
+                                   x=features, y=recovered_vals,
+                                   marker_color='#40C057')
+                        ])
+                        
+                        fig.update_layout(
+                            title='Before vs After Recovery (Z-Score Deviation)',
+                            barmode='group',
+                            height=300,
+                            yaxis_title='Z-Score (σ)',
+                            legend=dict(orientation='h', y=-0.2)
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+
             else:
                 st.markdown(explanation['explanation'])
     
