@@ -50,7 +50,7 @@ streamlit run app/streamlit_app.py  # Launch dashboard
 ## 📊 Model Performance
 
 | Metric | Baseline (Z-Score) | Isolation Forest | Improvement |
-|---|---|---|---|
+|--------|-------------------|-----------------|-------------|
 | Precision | 0.207 | 0.460 | +122.7% |
 | Recall | 0.951 | 0.815 | -14.4% |
 | F1-Score | 0.339 | 0.588 | +73.2% |
@@ -59,7 +59,7 @@ streamlit run app/streamlit_app.py  # Launch dashboard
 ### Detection by Anomaly Type
 
 | Type | Detection Rate |
-|---|---|
+|------|---------------|
 | Latency Cascade | 100.0% |
 | API Timeout | 84.6% |
 | Memory Leak | 82.4% |
@@ -68,54 +68,82 @@ streamlit run app/streamlit_app.py  # Launch dashboard
 
 ---
 
+## 🔬 Real-World Validation
+
+Model was trained **only on synthetic mobile app data**. Real-world tests are zero-shot — no retraining was done. Results validate that the feature engineering + Isolation Forest methodology transfers across domains.
+
+| Dataset | Domain | Files Tested | Avg F1 | Best F1 |
+|---------|--------|-------------|--------|---------|
+| Synthetic | Mobile app telemetry | — | 0.588 | — |
+| SKAB | Industrial sensors | 34 | 0.434 | 0.753 |
+| NAB | Server/Cloud metrics | 37 | 0.240 | 0.667 |
+
+### Comparison Across Domains
+
+| Metric | Synthetic | SKAB | NAB |
+|--------|-----------|------|-----|
+| Precision | 0.460 | 0.562 | 0.167 |
+| Recall | 0.815 | 0.361 | 0.568 |
+| F1-Score | 0.588 | 0.434 | 0.240 |
+
+> **Key Insight:** The model performs best on its trained domain (synthetic mobile data) and shows decreasing but meaningful performance on increasingly different domains (industrial sensors → server metrics). This is expected zero-shot transfer behavior — no retraining was performed on real-world data.
+
+**Datasets:** NAB (Numenta Anomaly Benchmark) · SKAB (Skoltech Anomaly Benchmark)
+
+---
+
 ## 🖥️ Dashboard Features
 
 | Feature | Description |
-|---|---|
-| 🚦 **System Status** | Real-time anomaly / normal indicator |
+|---------|-------------|
+| 🚦 **System Status** | Real-time anomaly / normal indicator with severity levels |
 | 📊 **Anomaly Score** | 0–100% confidence gauge |
-| 🎯 **Top Trigger** | Most contributing feature |
-| 📈 **Trend Chart** | Last 30 events with anomaly markers |
+| 🎯 **Top Trigger** | Most contributing feature with z-score deviation |
+| 📈 **Trend Chart** | Last 30 events with anomaly markers and threshold line |
 | 🎯 **Radar Chart** | System health shape (top 8 features) |
-| 🤖 **AI Analysis** | Root cause, impact, and recommendations |
-| 🔬 **Verification** | Ground truth vs prediction comparison |
-| 📥 **Export** | Download predictions as CSV |
+| 🔗 **RCA Chain** | Root cause chain tracing anomaly to its source |
+| 🔮 **What-If Simulation** | Projected recovery metrics if action is taken |
+| 🤖 **AI Analysis** | LLM-powered root cause, impact, and recommendations |
+| 🔬 **Model Verification** | Ground truth vs prediction comparison with live confusion matrix |
+| 📥 **Export** | Download all predictions as CSV |
 
 ---
 
 ## 🤖 AI Explainer
 
 | Mode | API Key | Speed | Quality |
-|---|---|---|---|
-| **Groq** (default) | System key included | ⚡ Fast | ⭐⭐⭐⭐⭐ |
-| **Gemini** | Optional | Moderate | ⭐⭐⭐⭐⭐ |
+|------|---------|-------|---------|
+| **Groq** (default) | System key included | ⚡ Fast (0.3–1s) | ⭐⭐⭐⭐⭐ |
 | **Rule-Based** | Not needed | ⚡ Instant | ⭐⭐⭐⭐ |
 
-> System API key is included. If rate limit is reached, enter your own key or switch to rule-based mode.
+> System API key is included. If rate limit is reached, enter your own key or switch to rule-based mode. Get a free Groq key at [console.groq.com/keys](https://console.groq.com/keys).
 
 ---
 
 ## 📁 Project Structure
 ```
-├── app/                        # Streamlit Dashboard
-│   ├── streamlit_app.py        # Main entry point
-│   ├── anomaly_detector.py     # Data generator + model wrapper
-│   ├── dashboard.py            # Charts and visualizations
-│   ├── ai_explainer.py         # LLM integration (Gemini/Groq)
-│   └── utils.py                # Constants and helpers
-├── src/                        # ML Pipeline
-│   ├── data_generator.py       # Synthetic data generation
-│   ├── preprocess.py           # Feature engineering + scaling
-│   ├── train_model.py          # Model training (grid search + ensemble)
-│   ├── evaluate_model.py       # Evaluation (9 visualizations)
-│   └── inference.py            # Production inference
-├── models/                     # Trained model artifacts (.pkl)
-├── evaluation/                 # Evaluation charts and reports
-├── data/                       # Raw and processed datasets
-├── notebooks/                  # EDA Jupyter notebook
-├── reports/                    # Analysis reports
-├── assets/                     # Pipeline diagram
-└── predictions/                # Inference outputs
+├── app/                            # Streamlit Dashboard
+│   ├── streamlit_app.py            # Main entry point
+│   ├── anomaly_detector.py         # Live data generator + model wrapper
+│   ├── dashboard.py                # Charts and visualizations
+│   ├── ai_explainer.py             # Groq LLM + rule-based fallback
+│   └── utils.py                    # Constants and helpers
+├── src/                            # ML Pipeline
+│   ├── data_generator.py           # Synthetic data generation
+│   ├── preprocess.py               # Feature engineering + scaling
+│   ├── train_model.py              # Model training (grid search + ensemble)
+│   ├── evaluate_model.py           # Evaluation (9 visualizations)
+│   ├── inference.py                # Production inference module
+│   ├── test_on_real_data(NAB).py        # NAB benchmark validation
+│   └── test_on_skab_data(SKAB).py        # SKAB benchmark validation
+├── models/                         # Trained model artifacts (.pkl)
+├── evaluation/                     # Evaluation charts and reports
+│   └── real_world/                 # NAB + SKAB test results
+├── data/                           # Raw and processed datasets
+├── notebooks/                      # EDA Jupyter notebook
+├── reports/                        # Analysis reports
+├── assets/                         # Pipeline diagram
+└── predictions/                    # Inference outputs
 ```
 
 ---
@@ -123,11 +151,12 @@ streamlit run app/streamlit_app.py  # Launch dashboard
 ## 🛠️ Tech Stack
 
 | Component | Technology |
-|---|---|
+|-----------|------------|
+| **Language** | Python 3.9+ |
 | **ML Model** | Isolation Forest (scikit-learn) |
 | **Dashboard** | Streamlit + Plotly |
-| **AI Explainer** | Groq / Google Gemini |
-| **Data** | Pandas · NumPy |
+| **AI Explainer** | Groq (Llama 3.1) |
+| **Data Processing** | Pandas · NumPy |
 | **Evaluation** | Matplotlib · Seaborn |
 
 ---
@@ -135,26 +164,42 @@ streamlit run app/streamlit_app.py  # Launch dashboard
 ## 📋 Dataset
 
 | Detail | Value |
-|---|---|
+|--------|-------|
 | **Total Events** | 10,000 (synthetic) |
 | **Train / Test** | 8,000 / 2,000 |
 | **Features** | 29 (rolling stats, z-scores, rates) |
 | **Anomaly Rate** | ~12.32% |
-| **Anomaly Types** | 5 |
+| **Anomaly Types** | 5 (memory leak, latency spike, fps drop, error burst, api timeout) |
+| **Real-World Validation** | NAB (37 files) + SKAB (34 files) |
+
+---
+
+## ✨ Key Novelties
+
+| Novelty | Description |
+|---------|-------------|
+| **Explainable AI** | LLM-powered root cause analysis with rule-based fallback |
+| **Real-Time Simulation** | Live monitoring with interactive anomaly forcing |
+| **RCA + What-If** | Causal chain analysis with projected recovery simulation |
+| **Feature Engineering** | 29 features from 5 raw metrics (rolling stats, z-scores, rates) |
+| **Ensemble Approach** | Grid search (36 combos) + top-3 model ensemble |
+| **Real-World Validation** | Zero-shot testing on NAB and SKAB benchmarks |
 
 ---
 
 ## 🔮 Future Improvements
 
-- Real data integration (Datadog, New Relic)
+- Real APM integration (Datadog, New Relic, Prometheus)
 - Supervised models (XGBoost) with labeled production data
-- Adaptive thresholding
-- Email / Slack alerting
+- Adaptive thresholding based on recent data patterns
+- Email / Slack alerting for critical anomalies
+- Kafka / Redis Streams for production-scale event streaming
 - Multi-app monitoring support
+- Feedback loop for continuous model improvement
 
 ---
 
 ## 👤 Author
 
 **Ashhar Ali**
-
+BCA Final Year Project — 2026
