@@ -19,7 +19,7 @@ Detects anomalies in mobile app telemetry (API latency, FPS, memory, errors) usi
 
 ## 🏗️ Pipeline
 
-![Pipeline](assets/pipeline.png)
+![Pipeline](assets/Pipeline.png)
 
 ---
 
@@ -158,8 +158,3 @@ streamlit run app/streamlit_app.py  # Launch dashboard
 
 **Ashhar Ali**
 
----
-
-## 📄 License
-
-MIT License — see [LICENSE](LICENSE) for details.

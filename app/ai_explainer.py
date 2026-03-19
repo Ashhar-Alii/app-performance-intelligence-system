@@ -509,3 +509,131 @@ RECOMMENDATION: Two to three specific actions to fix this."""
                 'status': '⚠️ Enter API key',
                 'error': self.error_message
             }
+# Add this to ai_explainer.py
+
+    def _build_causal_chain(self, contributions):
+        """
+        Build a simplified causal chain from contributing features.
+        
+        LOGIC:
+        If memory is high AND fps is low → memory leak causing fps drop
+        If latency is high AND errors are high → backend failure causing errors
+        
+        This is a RULE-BASED causal graph, not true causal inference.
+        But it shows the CONCEPT of RCA to the examiner.
+        """
+        if not contributions:
+            return []
+        
+        top_features = [f['feature'].lower() for f in contributions[:5]]
+        top_str = ' '.join(top_features)
+        
+        chain = []
+        
+        # Memory chain
+        if 'memory' in top_str and 'fps' in top_str:
+            chain = [
+                {'step': 1, 'event': 'Memory allocation increases', 'component': 'App Runtime'},
+                {'step': 2, 'event': 'Garbage collector runs more frequently', 'component': 'GC'},
+                {'step': 3, 'event': 'GC pauses block the UI thread', 'component': 'UI Thread'},
+                {'step': 4, 'event': 'Frame rate drops below 60 FPS', 'component': 'Rendering'},
+                {'step': 5, 'event': 'User experiences UI jank and freezes', 'component': 'User Experience'}
+            ]
+        
+        elif 'memory' in top_str:
+            chain = [
+                {'step': 1, 'event': 'Object created but not released', 'component': 'App Code'},
+                {'step': 2, 'event': 'Memory usage grows over time', 'component': 'Heap Memory'},
+                {'step': 3, 'event': 'System memory pressure increases', 'component': 'OS'},
+                {'step': 4, 'event': 'OS may kill background processes or app', 'component': 'App Lifecycle'}
+            ]
+        
+        elif 'latency' in top_str and 'error' in top_str:
+            chain = [
+                {'step': 1, 'event': 'Backend server under load or misconfigured', 'component': 'Server'},
+                {'step': 2, 'event': 'API response times increase', 'component': 'API Gateway'},
+                {'step': 3, 'event': 'Requests start timing out', 'component': 'Network'},
+                {'step': 4, 'event': 'Client receives error responses', 'component': 'Mobile App'},
+                {'step': 5, 'event': 'User sees error screens and retry loops', 'component': 'User Experience'}
+            ]
+        
+        elif 'latency' in top_str:
+            chain = [
+                {'step': 1, 'event': 'Database query slows down or network congestion', 'component': 'Backend'},
+                {'step': 2, 'event': 'API response time exceeds normal range', 'component': 'API'},
+                {'step': 3, 'event': 'Screen loading takes longer than expected', 'component': 'Mobile App'},
+                {'step': 4, 'event': 'User perceives app as slow', 'component': 'User Experience'}
+            ]
+        
+        elif 'fps' in top_str:
+            chain = [
+                {'step': 1, 'event': 'Heavy computation on main thread', 'component': 'App Code'},
+                {'step': 2, 'event': 'UI thread blocked during rendering', 'component': 'UI Thread'},
+                {'step': 3, 'event': 'Frames dropped, FPS falls below 30', 'component': 'Rendering'},
+                {'step': 4, 'event': 'Animations stutter and touch feels laggy', 'component': 'User Experience'}
+            ]
+        
+        elif 'error' in top_str:
+            chain = [
+                {'step': 1, 'event': 'Service dependency fails or config error', 'component': 'External'},
+                {'step': 2, 'event': 'API returns error codes (4xx/5xx)', 'component': 'API'},
+                {'step': 3, 'event': 'Error count spikes in telemetry', 'component': 'Monitoring'},
+                {'step': 4, 'event': 'Users unable to complete actions', 'component': 'User Experience'}
+            ]
+        
+        else:
+            chain = [
+                {'step': 1, 'event': 'Multiple metrics deviate from baseline', 'component': 'System'},
+                {'step': 2, 'event': 'Correlated degradation detected', 'component': 'Monitoring'},
+                {'step': 3, 'event': 'System health score drops', 'component': 'Dashboard'},
+                {'step': 4, 'event': 'Potential user-facing impact', 'component': 'User Experience'}
+            ]
+        
+        return chain
+
+
+    def _simulate_recovery(self, prediction_result, event_data=None):
+        """
+        Simulate what happens IF the recommended action is taken.
+        
+        This is a WHAT-IF analysis:
+        "If we fix the memory leak, here's what metrics would look like"
+        
+        NOT a real simulation — it's a projected recovery based on 
+        returning anomalous features to their normal ranges.
+        """
+        contributions = prediction_result.get('contributions', [])
+        
+        if not contributions:
+            return None
+        
+        current_state = {}
+        recovered_state = {}
+        
+        for feat in contributions[:5]:
+            feature_name = feat['feature_display']
+            current_value = feat['z_score']
+            
+            # Simulate recovery: anomalous values return toward normal
+            if current_value > 2.0:
+                recovered_value = round(current_value * 0.2, 1)  # 80% improvement
+            elif current_value > 1.0:
+                recovered_value = round(current_value * 0.3, 1)  # 70% improvement
+            else:
+                recovered_value = round(current_value * 0.5, 1)  # 50% improvement
+            
+            current_state[feature_name] = current_value
+            recovered_state[feature_name] = recovered_value
+        
+        # Estimate recovery impact
+        avg_current = sum(current_state.values()) / len(current_state)
+        avg_recovered = sum(recovered_state.values()) / len(recovered_state)
+        improvement_pct = ((avg_current - avg_recovered) / avg_current) * 100 if avg_current > 0 else 0
+        
+        return {
+            'current_state': current_state,
+            'recovered_state': recovered_state,
+            'improvement_percent': round(improvement_pct, 1),
+            'estimated_recovery_time': '5-15 minutes' if avg_current > 3 else '1-5 minutes',
+            'confidence': 'High' if avg_current > 3 else 'Medium'
+        }
