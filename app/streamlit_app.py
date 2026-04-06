@@ -180,6 +180,21 @@ with st.sidebar:
         help="Automatically generate new events every 3 seconds"
     )
     st.session_state.auto_generate = auto_generate
+
+    st.markdown("---")
+    st.markdown("### 📁 Upload Your App Data")
+    uploaded_csv = st.file_uploader(
+        "Upload CSV to analyze",
+        type=['csv'],
+        help="Upload your app's telemetry CSV to detect anomalies in real data"
+    )
+    if uploaded_csv is not None:
+        st.session_state.uploaded_csv = uploaded_csv
+        st.success("✅ CSV uploaded! Click 'Analyze CSV' below.")
+        if st.button("🔍 Analyze CSV", use_container_width=True, type="primary"):
+            st.session_state.analyze_csv = True
+
+    st.markdown("---")
     
     # Clear history
     if st.button("🗑️ Clear History", use_container_width=True):
@@ -286,6 +301,60 @@ with st.sidebar:
 # ============================================================================
 # GENERATE DATA (when button clicked or auto-generate)
 # ============================================================================
+# ── CSV Upload Analysis ──
+if st.session_state.get('analyze_csv') and st.session_state.get('uploaded_csv'):
+    st.session_state.analyze_csv = False
+    try:
+        df_upload = pd.read_csv(st.session_state.uploaded_csv)
+        st.markdown("### 📁 CSV Analysis Results")
+        st.caption(f"Analyzing {len(df_upload)} rows from your uploaded file...")
+
+        csv_results = []
+        for _, row in df_upload.iterrows():
+            row_dict = row.to_dict()
+            # Only keep features the model knows
+            features = {
+                k: float(v) for k, v in row_dict.items()
+                if k in detector.selected_features
+            }
+            if len(features) < 3:
+                st.warning("⚠️ CSV columns don't match model features. Make sure your CSV has the right column names.")
+                break
+            # Fill missing features with 0
+            for f in detector.selected_features:
+                if f not in features:
+                    features[f] = 0.0
+            pred = detector.predict(features)
+            csv_results.append({
+                'Row': _ + 1,
+                'Status': '🔴 Anomaly' if pred['is_anomaly'] else '🟢 Normal',
+                'Score (%)': f"{pred['anomaly_score_pct']:.1f}%",
+                'Severity': pred['severity'],
+                'Top Trigger': pred['top_trigger']
+            })
+
+        if csv_results:
+            results_df = pd.DataFrame(csv_results)
+            total = len(results_df)
+            anomalies = sum(1 for r in csv_results if 'Anomaly' in r['Status'])
+            
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Total Rows", total)
+            c2.metric("🔴 Anomalies Found", anomalies)
+            c3.metric("Anomaly Rate", f"{anomalies/total*100:.1f}%")
+            
+            st.dataframe(results_df, use_container_width=True, hide_index=True)
+            
+            st.download_button(
+                label="📥 Download Results CSV",
+                data=results_df.to_csv(index=False),
+                file_name="csv_analysis_results.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+    except Exception as e:
+        st.error(f"❌ Error analyzing CSV: {e}")
+        st.info("💡 Make sure your CSV has numeric columns matching the model's feature names.")
 should_generate = generate_clicked or st.session_state.auto_generate
 
 if should_generate:
@@ -811,12 +880,15 @@ if st.session_state.current_result:
                 avg_anomaly = np.mean(anomaly_scores)
                 
                 st.markdown(f"""
-                <div style="background: #F8F9FA; padding: 1rem; border-radius: 8px;">
-                    <b>📊 Score Analysis:</b><br>
-                    • Average score for Normal events: <b style="color: #40C057;">{avg_normal:.1f}%</b><br>
-                    • Average score for Anomaly events: <b style="color: #FF4B4B;">{avg_anomaly:.1f}%</b><br>
-                    • Score gap: <b>{abs(avg_anomaly - avg_normal):.1f}%</b>
-                    {'✅ Good separation!' if abs(avg_anomaly - avg_normal) > 15 else '⚠️ Moderate separation'}
+                <div style="background: #1E3A5F; padding: 1rem; border-radius: 8px;">
+                    <b style="color: white; font-size: 1rem;">📊 Score Analysis:</b><br>
+                    <span style="color: #A8C8E8;">• Average score for Normal events: </span>
+                    <b style="color: #69DB7C;">{avg_normal:.1f}%</b><br>
+                    <span style="color: #A8C8E8;">• Average score for Anomaly events: </span>
+                    <b style="color: #FF6B6B;">{avg_anomaly:.1f}%</b><br>
+                    <span style="color: #A8C8E8;">• Score gap: </span>
+                    <b style="color: white;">{abs(avg_anomaly - avg_normal):.1f}%  
+                    {'✅ Good separation!' if abs(avg_anomaly - avg_normal) > 15 else '⚠️ Moderate separation'}</b>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -889,12 +961,12 @@ else:
     for col, (icon, title, desc) in zip(feat_cols, features):
         with col:
             st.markdown(f"""
-            <div style="text-align: center; padding: 1.5rem; background: white;
-                        border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            <div style="text-align: center; padding: 1.5rem; background: #1E3A5F;
+                        border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
                         height: 160px;">
                 <p style="font-size: 2rem; margin: 0;">{icon}</p>
-                <p style="font-weight: 700; margin: 0.3rem 0;">{title}</p>
-                <p style="font-size: 0.85rem; color: #666;">{desc}</p>
+                <p style="font-weight: 700; margin: 0.3rem 0; color: white;">{title}</p>
+                <p style="font-size: 0.85rem; color: #A8C8E8;">{desc}</p>
             </div>
             """, unsafe_allow_html=True)
 
