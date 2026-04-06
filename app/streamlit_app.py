@@ -237,7 +237,15 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("### 🤖 AI Explainer")
-    ai_provider = st.selectbox("Provider", ['groq', 'rule_based'], format_func=lambda x: {'rule_based': '📝 Rule-Based', 'groq': '⚡ Groq AI'}, key='ai_provider_select')
+    ai_provider = st.selectbox(
+        "Provider",
+        ['groq', 'rule_based'],
+        format_func=lambda x: {
+            'rule_based': '📝 Rule-Based (No API needed)',
+            'groq': '⚡ Groq AI (Recommended)'
+        }[x],
+        key='ai_provider_select'
+    )
     
     user_api_key = ""
     if ai_provider != 'rule_based':
