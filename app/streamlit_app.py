@@ -458,9 +458,10 @@ if st.session_state.current_result:
             if explanation['provider'] in ['gemini', 'groq']:
                 # LLM worked successfully
                 st.markdown(f"""
-                <div style="background: #E8F5E9; border-left: 4px solid #4CAF50; 
+                <div style="background: #1B5E20; border-left: 4px solid #4CAF50; 
                             padding: 0.5rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 1rem;">
-                    <b>✅ Powered by: {provider_display}</b> — Live AI Analysis
+                    <b style="color: white;">✅ Powered by: {provider_display}</b>
+                    <span style="color: #F0F0F0;"> — Live AI Analysis</span>
                 </div>
                 """, unsafe_allow_html=True)
             
