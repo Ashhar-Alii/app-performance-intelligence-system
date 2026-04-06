@@ -704,27 +704,29 @@ if st.session_state.current_result:
             # Detection rate
             if generated_anomalies > 0:
                 detection_rate = (tp / generated_anomalies) * 100
+                bg_color = '#1B5E20' if detection_rate > 70 else '#B71C1C'
                 st.markdown(f"""
-                <div style="background: {'#E8F5E9' if detection_rate > 70 else '#FFF3E0'}; 
+                <div style="background: {bg_color}; 
                             padding: 1rem; border-radius: 8px; margin: 0.5rem 0;">
-                    <b>📊 Anomaly Detection Rate: {detection_rate:.1f}%</b>
+                    <b style="color: white; font-size: 1rem;">📊 Anomaly Detection Rate: {detection_rate:.1f}%</b>
                     <br>
-                    Out of {generated_anomalies} generated anomalies, 
+                    <span style="color: #F0F0F0;">Out of {generated_anomalies} generated anomalies, 
                     the model correctly detected {tp}.
-                    {'✅ Good performance!' if detection_rate > 70 else '⚠️ Some anomalies were subtle and missed.'}
+                    {'✅ Good performance!' if detection_rate > 70 else '⚠️ Some anomalies were subtle and missed.'}</span>
                 </div>
                 """, unsafe_allow_html=True)
             
             if generated_normal > 0:
                 precision_rate = (tp / detected_anomalies * 100) if detected_anomalies > 0 else 0
+                bg_color2 = '#1B5E20' if precision_rate > 50 else '#B71C1C'
                 st.markdown(f"""
-                <div style="background: {'#E8F5E9' if precision_rate > 50 else '#FFF3E0'}; 
+                <div style="background: {bg_color2}; 
                             padding: 1rem; border-radius: 8px; margin: 0.5rem 0;">
-                    <b>🎯 Alert Precision: {precision_rate:.1f}%</b>
+                    <b style="color: white; font-size: 1rem;">🎯 Alert Precision: {precision_rate:.1f}%</b>
                     <br>
-                    Out of {detected_anomalies} alerts raised, 
+                    <span style="color: #F0F0F0;">Out of {detected_anomalies} alerts raised, 
                     {tp} were actual anomalies.
-                    {'✅ Reliable alerts!' if precision_rate > 50 else '⚠️ Some false alarms present.'}
+                    {'✅ Reliable alerts!' if precision_rate > 50 else '⚠️ Some false alarms present.'}</span>
                 </div>
                 """, unsafe_allow_html=True)
             
