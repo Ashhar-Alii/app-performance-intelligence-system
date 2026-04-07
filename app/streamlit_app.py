@@ -128,7 +128,7 @@ if st.session_state.user_email is None:
             st.session_state.login_attempts = 0
             st.session_state.lockout_until = None
 
-    # Clean UI Header
+    # Clean UI Header (Fixed layout, native Streamlit support)
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown('<h1 style="text-align: center; color: #1E3A5F;">🛡️ Anomaly Intelligence System</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align: center; color: #666; font-size: 1.1rem; margin-bottom: 2rem;">Secure SaaS Performance Monitoring</p>', unsafe_allow_html=True)
@@ -148,7 +148,6 @@ if st.session_state.user_email is None:
             with c1:
                 st.checkbox("Remember Me")
             with c2:
-                # --- NEW: FUNCTIONAL FORGOT PASSWORD ---
                 with st.popover("Forgot Password?"):
                     st.markdown("**Reset Your Password**")
                     rec_email = st.text_input("Confirm your Gmail Address", key="rec_email")
@@ -297,8 +296,15 @@ except Exception as e:
 with st.sidebar:
     st.markdown(f"### 👤 Logged in as:")
     st.caption(f"**{st.session_state.user_email}**")
+    
+    # --- BUG FIX: Completely clear session state on logout ---
     if st.button("🚪 Secure Logout", use_container_width=True):
         st.session_state.user_email = None
+        st.session_state.history = []
+        st.session_state.current_result = None
+        st.session_state.current_event = None
+        st.session_state.current_explanation = None
+        st.session_state.auto_generate = False
         st.rerun()
     st.markdown("---")
     
