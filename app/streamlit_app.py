@@ -26,6 +26,9 @@ import hashlib
 import re
 from datetime import datetime, timedelta
 
+# --- NEW: Import Cookie Controller ---
+from streamlit_cookies_controller import CookieController
+
 # ─────────────────────────────────────────
 # Path setup
 # ─────────────────────────────────────────
@@ -85,6 +88,15 @@ def init_session_state():
         st.session_state.lockout_until = None
 
 init_session_state()
+
+# --- NEW: Initialize Cookie Controller and check for active cookie ---
+cookie_controller = CookieController()
+
+if st.session_state.user_email is None:
+    # Try to grab the email from the browser's cookies
+    saved_email = cookie_controller.get('user_email')
+    if saved_email:
+        st.session_state.user_email = saved_email
 
 def hash_password(password):
     """Securely hash the password before saving/checking."""
@@ -146,7 +158,7 @@ if st.session_state.user_email is None:
             # UI Elements for better UX
             c1, c2 = st.columns(2)
             with c1:
-                st.checkbox("Remember Me")
+                remember_me = st.checkbox("Remember Me") # <--- Capturing this toggle
             with c2:
                 with st.popover("Forgot Password?"):
                     st.markdown("**Reset Your Password**")
@@ -182,6 +194,11 @@ if st.session_state.user_email is None:
                         if db_hash == hash_password(log_pass):
                             st.session_state.user_email = clean_log_email
                             st.session_state.login_attempts = 0 # Reset on success
+                            
+                            # --- NEW: SAVE COOKIE IF CHECKED ---
+                            if remember_me:
+                                cookie_controller.set('user_email', clean_log_email, max_age=30*86400) # Save for 30 days
+                            
                             st.success("Login successful! Redirecting...")
                             time.sleep(1)
                             st.rerun()
@@ -297,14 +314,18 @@ with st.sidebar:
     st.markdown(f"### 👤 Logged in as:")
     st.caption(f"**{st.session_state.user_email}**")
     
-    # --- BUG FIX: Completely clear session state on logout ---
     if st.button("🚪 Secure Logout", use_container_width=True):
+        # Clear session state
         st.session_state.user_email = None
         st.session_state.history = []
         st.session_state.current_result = None
         st.session_state.current_event = None
         st.session_state.current_explanation = None
         st.session_state.auto_generate = False
+        
+        # --- NEW: Delete the Remember Me cookie on logout ---
+        cookie_controller.remove('user_email')
+        
         st.rerun()
     st.markdown("---")
     
