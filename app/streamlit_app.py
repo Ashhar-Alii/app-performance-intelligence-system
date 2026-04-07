@@ -128,7 +128,7 @@ if st.session_state.user_email is None:
             st.session_state.login_attempts = 0
             st.session_state.lockout_until = None
 
-    # Clean UI Header (Fixed layout, native Streamlit support)
+    # Clean UI Header
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown('<h1 style="text-align: center; color: #1E3A5F;">🛡️ Anomaly Intelligence System</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align: center; color: #666; font-size: 1.1rem; margin-bottom: 2rem;">Secure SaaS Performance Monitoring</p>', unsafe_allow_html=True)
@@ -148,23 +148,40 @@ if st.session_state.user_email is None:
             with c1:
                 st.checkbox("Remember Me")
             with c2:
+                # --- NEW: FUNCTIONAL FORGOT PASSWORD ---
                 with st.popover("Forgot Password?"):
-                    st.caption("Enter your email to receive a recovery link.")
-                    st.text_input("Recovery Email", key="rec_email")
-                    if st.button("Send Link", key="rec_btn"):
-                        st.success("If this email exists, a link has been sent.")
+                    st.markdown("**Reset Your Password**")
+                    rec_email = st.text_input("Confirm your Gmail Address", key="rec_email")
+                    new_pass = st.text_input("Enter New Password", type="password", key="new_pass")
+                    if st.button("Update Password", key="rec_btn", type="primary"):
+                        if rec_email and new_pass and supabase:
+                            clean_rec_email = rec_email.strip().lower()
+                            # Check if email exists
+                            res = supabase.table("app_users").select("email").eq("email", clean_rec_email).execute()
+                            if len(res.data) > 0:
+                                if len(new_pass) >= 8:
+                                    # Update password
+                                    supabase.table("app_users").update({"password_hash": hash_password(new_pass)}).eq("email", clean_rec_email).execute()
+                                    st.success("✅ Password updated successfully! You can now log in.")
+                                else:
+                                    st.error("Password must be at least 8 characters.")
+                            else:
+                                st.error("No account found with this email.")
+                        else:
+                            st.warning("Please fill all fields.")
             
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("Log In", use_container_width=True, type="primary"):
                 if log_email and log_pass and supabase:
-                    # Generic Error Message Strategy
+                    # Clean the email (remove spaces and make lowercase)
+                    clean_log_email = log_email.strip().lower()
                     generic_error = "Incorrect email or password."
                     
-                    res = supabase.table("app_users").select("*").eq("email", log_email).execute()
+                    res = supabase.table("app_users").select("*").eq("email", clean_log_email).execute()
                     if len(res.data) > 0:
                         db_hash = res.data[0]['password_hash']
                         if db_hash == hash_password(log_pass):
-                            st.session_state.user_email = log_email
+                            st.session_state.user_email = clean_log_email
                             st.session_state.login_attempts = 0 # Reset on success
                             st.success("Login successful! Redirecting...")
                             time.sleep(1)
@@ -193,20 +210,24 @@ if st.session_state.user_email is None:
             if st.button("Create Account", use_container_width=True):
                 if not reg_email or not reg_pass:
                     st.warning("Please fill all fields.")
-                elif not is_valid_gmail(reg_email):
-                    st.error("Format Error: You must use a valid @gmail.com address to register.")
-                elif len(reg_pass) < 8:
-                    st.error("Security Error: Password must be at least 8 characters long.")
-                elif supabase:
-                    check = supabase.table("app_users").select("email").eq("email", reg_email).execute()
-                    if len(check.data) > 0:
-                        st.error("An account with this email already exists.")
-                    else:
-                        supabase.table("app_users").insert({
-                            "email": reg_email,
-                            "password_hash": hash_password(reg_pass)
-                        }).execute()
-                        st.success("✅ Account securely created! You can now log in.")
+                else:
+                    # Clean the email (remove spaces and make lowercase)
+                    clean_reg_email = reg_email.strip().lower()
+                    
+                    if not is_valid_gmail(clean_reg_email):
+                        st.error("Format Error: You must use a valid @gmail.com address to register.")
+                    elif len(reg_pass) < 8:
+                        st.error("Security Error: Password must be at least 8 characters long.")
+                    elif supabase:
+                        check = supabase.table("app_users").select("email").eq("email", clean_reg_email).execute()
+                        if len(check.data) > 0:
+                            st.error("An account with this email already exists.")
+                        else:
+                            supabase.table("app_users").insert({
+                                "email": clean_reg_email,
+                                "password_hash": hash_password(reg_pass)
+                            }).execute()
+                            st.success("✅ Account securely created! You can now log in.")
     
     st.stop() # <--- HALTS SCRIPT HERE IF NOT LOGGED IN
 
