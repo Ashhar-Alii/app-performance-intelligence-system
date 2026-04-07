@@ -128,19 +128,18 @@ if st.session_state.user_email is None:
             st.session_state.login_attempts = 0
             st.session_state.lockout_until = None
 
-    st.markdown('<h1 style="text-align: center; color: #1E3A5F; margin-bottom: 0;">🛡️ Anomaly Intelligence</h1>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align: center; color: #666; margin-top: 5px;">Secure SaaS Performance Monitoring</p>', unsafe_allow_html=True)
+    # Clean UI Header (Fixed layout, native Streamlit support)
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown('<h1 style="text-align: center; color: #1E3A5F;">🛡️ Anomaly Intelligence System</h1>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center; color: #666; font-size: 1.1rem; margin-bottom: 2rem;">Secure SaaS Performance Monitoring</p>', unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
-        st.markdown("""
-        <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 2rem;">
-        """, unsafe_allow_html=True)
-        
         tab_login, tab_signup = st.tabs(["🔑 Log In", "📝 Sign Up"])
         
         # --- LOGIN TAB ---
         with tab_login:
+            st.markdown("#### Welcome Back")
             log_email = st.text_input("Email Address", placeholder="name@gmail.com", max_chars=100, key="log_email")
             log_pass = st.text_input("Password", type="password", max_chars=128, key="log_pass")
             
@@ -183,10 +182,6 @@ if st.session_state.user_email is None:
                         st.rerun()
                 else:
                     st.warning("Please enter both email and password.")
-            
-            st.markdown("<div style='text-align: center; margin: 15px 0; color: #999;'>OR</div>", unsafe_allow_html=True)
-            if st.button("🌐 Continue with Google", use_container_width=True):
-                st.info("💡 Google OAuth requires redirect configurations. For this project phase, please use the standard Email Login above with a Gmail address.")
 
         # --- SIGNUP TAB ---
         with tab_signup:
@@ -194,7 +189,8 @@ if st.session_state.user_email is None:
             reg_email = st.text_input("Gmail Address", placeholder="yourname@gmail.com", max_chars=100, key="reg_email")
             reg_pass = st.text_input("Create Password", type="password", placeholder="Minimum 8 characters", max_chars=128, key="reg_pass")
             
-            if st.button("Sign Up", use_container_width=True):
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Create Account", use_container_width=True):
                 if not reg_email or not reg_pass:
                     st.warning("Please fill all fields.")
                 elif not is_valid_gmail(reg_email):
@@ -211,8 +207,6 @@ if st.session_state.user_email is None:
                             "password_hash": hash_password(reg_pass)
                         }).execute()
                         st.success("✅ Account securely created! You can now log in.")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
     
     st.stop() # <--- HALTS SCRIPT HERE IF NOT LOGGED IN
 
