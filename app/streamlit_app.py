@@ -103,12 +103,12 @@ cookie_controller = CookieController(key='cc')
 if st.session_state.logout_performed:
     # Wipe the cookie from the internal cache that CookieController keeps
     # in st.session_state so .get() returns None on this rerun
-    if 'cc' in st.session_state and isinstance(st.session_state['cc'], dict):
-        st.session_state['cc'].pop('user_email', None)
+    if 'cc' in st.session_state:
+        st.session_state['cc'] = {}
     st.session_state.logout_performed = False   # reset flag
 
 # Restore session from cookie only when not logged in
-if st.session_state.user_email is None:
+if st.session_state.user_email is None and not st.session_state.logout_performed:
     saved_email = cookie_controller.get('user_email')
     if saved_email:
         st.session_state.user_email = saved_email
@@ -191,7 +191,7 @@ if st.session_state.user_email is None:
                     if st.button("Update Password", key="rec_btn", type="primary"):
                         raw_rec_email   = st.session_state.get("rec_email_input", "")
                         raw_new_pass    = st.session_state.get("new_pass_input",  "")
-                        clean_rec_email = raw_rec_email.strip().lower()
+                        clean_rec_email = re.sub(r'\s+', '', raw_rec_email).lower()
 
                         if not raw_rec_email or not raw_new_pass:
                             st.warning("Please fill all fields.")
@@ -202,12 +202,12 @@ if st.session_state.user_email is None:
                         elif supabase:
                             res = supabase.table("app_users") \
                                           .select("email") \
-                                          .eq("email", clean_rec_email) \
+                                          .ilike("email", clean_rec_email) \
                                           .execute()
                             if len(res.data) > 0:
                                 supabase.table("app_users") \
                                         .update({"password_hash": hash_password(raw_new_pass)}) \
-                                        .eq("email", clean_rec_email) \
+                                        .ilike("email", clean_rec_email) \
                                         .execute()
                                 st.success("✅ Password updated! You can now log in.")
                             else:
@@ -216,11 +216,11 @@ if st.session_state.user_email is None:
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("Log In", use_container_width=True, type="primary"):
                 if log_email and log_pass and supabase:
-                    clean_email   = log_email.strip().lower()
+                    clean_email   =  re.sub(r'\s+', '', log_email).lower()
                     generic_error = "Incorrect email or password."
 
                     res = supabase.table("app_users").select("*") \
-                                  .eq("email", clean_email).execute()
+                                  .ilike("email", clean_email).execute()
 
                     if res.data and res.data[0]['password_hash'] == hash_password(log_pass):
                         st.session_state.user_email     = clean_email
@@ -254,7 +254,7 @@ if st.session_state.user_email is None:
                 if not reg_email or not reg_pass:
                     st.warning("Please fill all fields.")
                 else:
-                    clean_reg = reg_email.strip().lower()
+                    clean_reg = re.sub(r'\s+', '', reg_email).lower()
                     if not is_valid_gmail(clean_reg):
                         st.error("You must use a valid @gmail.com address.")
                     elif len(reg_pass) < 8:
@@ -340,7 +340,8 @@ with st.sidebar:
         # at the top of the script knows to wipe the stale cache.
         st.session_state.logout_performed = True
 
-        # Remove the persistent browser cookie
+        # Force expire cookie in browser
+        cookie_controller.set('user_email', '', max_age=0)
         cookie_controller.remove('user_email')
 
         # Clear all app state
