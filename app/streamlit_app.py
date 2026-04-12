@@ -229,21 +229,35 @@ if st.session_state.user_email is None:
 # ============================================================================
 # MODEL & GENERATOR
 # ============================================================================
+# ============================================================================
+# CACHED MODEL LOADING
+# ============================================================================
+
 @st.cache_resource
 def load_detector():
     detector = AppAnomalyDetector(models_dir='models')
     detector.load()
     return detector
 
-@st.cache_resource
-def load_generator(detector):
+
+# FIXED: No parameter + explicit hash_func (safest)
+@st.cache_resource(hash_funcs={AppAnomalyDetector: lambda _: None})
+def load_generator(detector):          # We still accept it for clarity
     return LiveDataGenerator(
         selected_features=detector.selected_features,
         models_dir=os.path.join(PROJECT_ROOT, 'models')
     )
 
-detector = load_detector()
-generator = load_generator(detector)
+
+# Load them
+try:
+    detector = load_detector()
+    generator = load_generator(detector)   # Now safe
+    models_loaded = True
+except Exception as e:
+    st.error(f"❌ Failed to load models: {e}")
+    st.info("💡 Make sure you've run `train_model.py` first.")
+    st.stop()
 
 
 # ============================================================================
