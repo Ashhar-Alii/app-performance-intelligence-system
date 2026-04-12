@@ -89,7 +89,7 @@ def init_session_state():
 
 init_session_state()
 
-# --- NEW: Initialize Cookie Controller and check for active cookie ---
+# --- Initialize Cookie Controller and check for active cookie ---
 cookie_controller = CookieController()
 
 if st.session_state.user_email is None:
@@ -195,7 +195,7 @@ if st.session_state.user_email is None:
                             st.session_state.user_email = clean_log_email
                             st.session_state.login_attempts = 0 # Reset on success
                             
-                            # --- NEW: SAVE COOKIE IF CHECKED ---
+                            # --- SAVE COOKIE IF CHECKED ---
                             if remember_me:
                                 cookie_controller.set('user_email', clean_log_email, max_age=30*86400) # Save for 30 days
                             
@@ -323,8 +323,8 @@ with st.sidebar:
         st.session_state.current_explanation = None
         st.session_state.auto_generate = False
         
-        # --- NEW: Delete the Remember Me cookie on logout ---
-        cookie_controller.remove('user_email')
+        # --- ROBUST LOGOUT: Expire and delete the Remember Me cookie ---
+        cookie_controller.set('user_email', '', max_age=0)
         
         st.rerun()
     st.markdown("---")
