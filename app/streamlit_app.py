@@ -93,10 +93,13 @@ init_session_state()
 cookie_controller = CookieController()
 
 if st.session_state.user_email is None:
-    # Try to grab the email from the browser's cookies
-    saved_email = cookie_controller.get('user_email')
-    if saved_email:
-        st.session_state.user_email = saved_email
+    try:
+        saved_email = cookie_controller.get('user_email')
+        if saved_email:
+            st.session_state.user_email = saved_email
+    except KeyError:
+        # No cookie found, user not logged in
+        pass
 
 def hash_password(password):
     """Securely hash the password before saving/checking."""
@@ -195,9 +198,24 @@ if st.session_state.user_email is None:
                             st.session_state.user_email = clean_log_email
                             st.session_state.login_attempts = 0 # Reset on success
                             
+                            # ✅ Clear any old cookies from previous login
+                            try:
+                                old_cookie = cookie_controller.get('user_email')
+                                if old_cookie and old_cookie != clean_log_email:
+                                    cookie_controller.remove('user_email')
+                            except KeyError:
+                                pass
+                            
                             # --- NEW: SAVE COOKIE IF CHECKED ---
                             if remember_me:
                                 cookie_controller.set('user_email', clean_log_email, max_age=30*86400) # Save for 30 days
+                            else:
+                                # If Remember Me is NOT checked, make sure to remove any old cookies
+                                try:
+                                    if cookie_controller.get('user_email'):
+                                        cookie_controller.remove('user_email')
+                                except KeyError:
+                                    pass
                             
                             st.success("Login successful! Redirecting...")
                             time.sleep(1)
