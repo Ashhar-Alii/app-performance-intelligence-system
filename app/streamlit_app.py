@@ -94,24 +94,18 @@ init_session_state()
 # ============================================================================
 cookie_controller = CookieController()
 
-# Force clear any old cookies on fresh app load
-try:
-    all_cookies = cookie_controller.get_all()
-    if 'user_email' in all_cookies and st.session_state.user_email is None:
-        # Only auto-restore if user was logged in before
-        # Otherwise clear it
-        cookie_controller.remove('user_email')
-except Exception as e:
-    pass  # No cookies or error, that's fine
-
-# Now check if there's a valid cookie to restore
+# ✅ NEW LOGIC: Smart cookie restoration
 if st.session_state.user_email is None:
     try:
         saved_email = cookie_controller.get('user_email')
         if saved_email:
+            # User has a cookie, auto-login
             st.session_state.user_email = saved_email
+        else:
+            # No cookie, user is logged out
+            pass
     except KeyError:
-        # No cookie found, user not logged in
+        # No cookie exists, user is logged out
         pass
 
 def hash_password(password):
@@ -200,9 +194,6 @@ if st.session_state.user_email is None:
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("Log In", use_container_width=True, type="primary"):
                 if log_email and log_pass and supabase:
-                    # Get the Remember Me value
-                    remember_me = st.session_state.get('remember_me_checkbox', False)
-                    
                     clean_log_email = log_email.strip().lower()
                     generic_error = "Incorrect email or password."
                     
@@ -213,20 +204,22 @@ if st.session_state.user_email is None:
                             st.session_state.user_email = clean_log_email
                             st.session_state.login_attempts = 0
                             
-                            # Clear ALL cookies first
+                            # Get Remember Me checkbox value
+                            remember_me = st.session_state.get('remember_me_checkbox', False)
+                            
+                            # ✅ IMPORTANT: Always clear ANY existing cookie first
                             try:
                                 cookie_controller.remove('user_email')
                             except KeyError:
-                                pass
+                                pass  # No cookie exists, that's fine
                             
-                            # Only save if Remember Me is checked
+                            # ✅ Only set NEW cookie if user checked "Remember Me"
                             if remember_me:
                                 cookie_controller.set('user_email', clean_log_email, max_age=30*86400)
-                                st.info("✅ 'Remember Me' enabled - you'll stay logged in")
+                                st.success("✅ Login successful! You'll stay logged in on this device.")
                             else:
-                                st.info("ℹ️ 'Remember Me' disabled - you'll be logged out on browser close")
+                                st.success("✅ Login successful! You'll be logged out when you close the browser.")
                             
-                            st.success("Login successful! Redirecting...")
                             time.sleep(1)
                             st.rerun()
                         else:
@@ -236,7 +229,6 @@ if st.session_state.user_email is None:
                         st.session_state.login_attempts += 1
                         st.error(generic_error)
                         
-                    # Trigger Lockout after 5 attempts
                     if st.session_state.login_attempts >= 5:
                         st.session_state.lockout_until = datetime.now() + timedelta(seconds=60)
                         st.rerun()
