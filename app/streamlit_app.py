@@ -324,7 +324,11 @@ with st.sidebar:
         st.session_state.auto_generate = False
         
         # --- NEW: Delete the Remember Me cookie on logout ---
-        cookie_controller.remove('user_email')
+        try:
+            if cookie_controller.get('user_email'):
+                cookie_controller.remove('user_email')
+        except Exception:
+            pass  # Silently ignore if cookie doesn't exist
         
         st.rerun()
     st.markdown("---")
