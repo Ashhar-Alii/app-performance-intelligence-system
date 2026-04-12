@@ -89,9 +89,22 @@ def init_session_state():
 
 init_session_state()
 
-# --- NEW: Initialize Cookie Controller and check for active cookie ---
+# ============================================================================
+# CLEAR OLD COOKIES ON APP START (Safety Measure)
+# ============================================================================
 cookie_controller = CookieController()
 
+# Force clear any old cookies on fresh app load
+try:
+    all_cookies = cookie_controller.get_all()
+    if 'user_email' in all_cookies and st.session_state.user_email is None:
+        # Only auto-restore if user was logged in before
+        # Otherwise clear it
+        cookie_controller.remove('user_email')
+except Exception as e:
+    pass  # No cookies or error, that's fine
+
+# Now check if there's a valid cookie to restore
 if st.session_state.user_email is None:
     try:
         saved_email = cookie_controller.get('user_email')
@@ -161,7 +174,7 @@ if st.session_state.user_email is None:
             # UI Elements for better UX
             c1, c2 = st.columns(2)
             with c1:
-                remember_me = st.checkbox("Remember Me") # <--- Capturing this toggle
+                remember_me = st.checkbox("Remember Me",key="remember_me_checkbox") # <--- Capturing this toggle
             with c2:
                 with st.popover("Forgot Password?"):
                     st.markdown("**Reset Your Password**")
@@ -187,7 +200,9 @@ if st.session_state.user_email is None:
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("Log In", use_container_width=True, type="primary"):
                 if log_email and log_pass and supabase:
-                    # Clean the email (remove spaces and make lowercase)
+                    # Get the Remember Me value
+                    remember_me = st.session_state.get('remember_me_checkbox', False)
+                    
                     clean_log_email = log_email.strip().lower()
                     generic_error = "Incorrect email or password."
                     
@@ -196,26 +211,20 @@ if st.session_state.user_email is None:
                         db_hash = res.data[0]['password_hash']
                         if db_hash == hash_password(log_pass):
                             st.session_state.user_email = clean_log_email
-                            st.session_state.login_attempts = 0 # Reset on success
+                            st.session_state.login_attempts = 0
                             
-                            # ✅ Clear any old cookies from previous login
+                            # Clear ALL cookies first
                             try:
-                                old_cookie = cookie_controller.get('user_email')
-                                if old_cookie and old_cookie != clean_log_email:
-                                    cookie_controller.remove('user_email')
+                                cookie_controller.remove('user_email')
                             except KeyError:
                                 pass
                             
-                            # --- NEW: SAVE COOKIE IF CHECKED ---
+                            # Only save if Remember Me is checked
                             if remember_me:
-                                cookie_controller.set('user_email', clean_log_email, max_age=30*86400) # Save for 30 days
+                                cookie_controller.set('user_email', clean_log_email, max_age=30*86400)
+                                st.info("✅ 'Remember Me' enabled - you'll stay logged in")
                             else:
-                                # If Remember Me is NOT checked, make sure to remove any old cookies
-                                try:
-                                    if cookie_controller.get('user_email'):
-                                        cookie_controller.remove('user_email')
-                                except KeyError:
-                                    pass
+                                st.info("ℹ️ 'Remember Me' disabled - you'll be logged out on browser close")
                             
                             st.success("Login successful! Redirecting...")
                             time.sleep(1)
