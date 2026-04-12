@@ -303,13 +303,6 @@ st.markdown('<h1 style="text-align: center; color: #1E3A5F;">🛡️ Anomaly Det
 st.markdown('<p style="text-align: center; color: #666; margin-top: -10px;">Real-Time Mobile App Performance Monitoring & AI-Powered Analysis</p>', unsafe_allow_html=True)
 st.markdown("")
 tab_live, tab_history = st.tabs(["🔴 Live Dashboard", "📈 Historical Database Trends"])
-
-with tab_live:
-    if st.session_state.current_result:
-        # ... (Your entire live dashboard UI code from the previous version)
-        # This part is long and unchanged, so I'll omit it for brevity.
-        # Just copy your existing `with tab_live:` block 
-
 # ============================================================================
 # TAB 1: LIVE DASHBOARD
 # ============================================================================
