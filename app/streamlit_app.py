@@ -1,26 +1,3 @@
-Ah, yes! This is a classic challenge when building web apps with Streamlit. 
-
-### 🧠 Why did "Remember Me" fail?
-By default, Streamlit stores memory in `st.session_state`. This memory **only exists for your current active browser tab**. The moment you hit "Refresh" (F5), Streamlit wipes the entire session clean and starts fresh. 
-
-To make "Remember Me" actually survive a page refresh or browser restart, we must store your login token inside your browser's **Cookies**, just like real web applications do!
-
-### 🛠️ The Fix (Adding Cookies)
-To write cookies in Streamlit, we need a lightweight third-party package.
-
-**Step 1:** Open your terminal and install this package (and add it to your `requirements.txt` file before pushing to Streamlit Cloud):
-```bash
-pip install streamlit-cookies-controller
-```
-
-**Step 2:** I have updated your `streamlit_app.py` to use this cookie manager. 
-* When you check "Remember Me", it saves your email in a cookie for 30 days. 
-* When you refresh the page, it automatically reads the cookie and logs you straight in.
-* When you click "Secure Logout", it deletes the cookie.
-
-Copy and paste this fully updated code into `app/streamlit_app.py`:
-
-```python
 """
 streamlit_app.py - Main Streamlit Dashboard for Anomaly Detection
 
@@ -821,4 +798,3 @@ if st.session_state.auto_generate:
 
 st.markdown("---")
 st.markdown('<p style="text-align: center; color: #999; font-size: 0.8rem;">🛡️ Anomaly Detection Intelligence System</p>', unsafe_allow_html=True)
-```
