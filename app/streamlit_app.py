@@ -100,23 +100,52 @@ def init_session_state():
 init_session_state()
 
 # ============================================================================
-# CLEAR OLD COOKIES ON APP START (Safety Measure)
+# SESSION MANAGER (Replaces Cookies for Session Management)
+# ============================================================================
+
+def get_session_user():
+    """Get user from session (cleared on browser close)"""
+    return st.session_state.get('_session_user', None)
+
+def set_session_user(email):
+    """Set user in session (cleared on browser close)"""
+    st.session_state['_session_user'] = email
+
+def clear_session_user():
+    """Clear user from session (user is logged out)"""
+    if '_session_user' in st.session_state:
+        del st.session_state['_session_user']
+
+def should_persist_login():
+    """Check if user enabled 'Remember Me' for multi-day persistence"""
+    return st.session_state.get('_persist_login', False)
+
+def set_persist_login(persist):
+    """Set whether to use cookies for persistence"""
+    st.session_state['_persist_login'] = persist
+
+# ============================================================================
+# SESSION & COOKIE INITIALIZATION
 # ============================================================================
 cookie_controller = CookieController()
 
-# ✅ NEW LOGIC: Smart cookie restoration
+# Check if user has a valid session
 if st.session_state.user_email is None:
-    try:
-        saved_email = cookie_controller.get("user_email")
-        if saved_email:
-            # User has a cookie, auto-login
-            st.session_state.user_email = saved_email
-        else:
-            # No cookie, user is logged out
-            pass
-    except KeyError:
-        # No cookie exists, user is logged out
-        pass
+    session_user = get_session_user()
+    
+    if session_user:
+        # User has an active session (browser still open)
+        st.session_state.user_email = session_user
+    else:
+        # No session - check if user enabled "Remember Me" with persistent cookie
+        if should_persist_login():
+            try:
+                saved_email = cookie_controller.get('user_email')
+                if saved_email:
+                    st.session_state.user_email = saved_email
+                    set_session_user(saved_email)  # Restore to session
+            except KeyError:
+                pass  # No cookie or expired
 
 
 def hash_password(password):
@@ -251,34 +280,40 @@ if st.session_state.user_email is None:
                     if len(res.data) > 0:
                         db_hash = res.data[0]["password_hash"]
                         if db_hash == hash_password(log_pass):
+                            # ✅ Login successful
                             st.session_state.user_email = clean_log_email
                             st.session_state.login_attempts = 0
-
-                            # ✅ Get the actual checkbox value from session state
+                            
+                            # Get the Remember Me checkbox value
                             remember_me_checked = st.session_state.get(
                                 "remember_me_checkbox", False
                             )
-
-                            # ✅ CRITICAL: Always delete old cookie first
+                            
+                            # Always clear old cookies and session first
                             try:
                                 cookie_controller.remove("user_email")
                             except KeyError:
                                 pass
-
-                            # ✅ Only set cookie if "Remember Me" WAS checked
+                            clear_session_user()
+                            
+                            # Set current session (stays until browser closes)
+                            set_session_user(clean_log_email)
+                            
+                            # Only persist to cookie if "Remember Me" is checked
                             if remember_me_checked:
                                 cookie_controller.set(
                                     "user_email", clean_log_email, max_age=30 * 86400
                                 )
+                                set_persist_login(True)
                                 st.success(
-                                    "✅ Login successful! You'll stay logged in on this device."
+                                    "✅ Login successful! You'll stay logged in for 30 days."
                                 )
                             else:
-                                # Explicitly don't save cookie
+                                set_persist_login(False)
                                 st.success(
-                                    "✅ Login successful! You'll be logged out when you close the browser."
+                                    "✅ Login successful! You'll be logged out when you close your browser."
                                 )
-
+                            
                             time.sleep(1)
                             st.rerun()
                         else:
@@ -430,22 +465,28 @@ with st.sidebar:
     st.caption(f"**{st.session_state.user_email}**")
 
     if st.button("🚪 Secure Logout", use_container_width=True):
-        # Clear session state
+        # ✅ Clear EVERYTHING
         st.session_state.user_email = None
         st.session_state.history = []
         st.session_state.current_result = None
         st.session_state.current_event = None
         st.session_state.current_explanation = None
         st.session_state.auto_generate = False
-
-        # --- NEW: Delete the Remember Me cookie on logout ---
+        
+        # Clear session
+        clear_session_user()
+        set_persist_login(False)
+        
+        # Clear cookies
         try:
-            if cookie_controller.get("user_email"):
-                cookie_controller.remove("user_email")
-        except Exception:
-            pass  # Silently ignore if cookie doesn't exist
-
+            cookie_controller.remove("user_email")
+        except KeyError:
+            pass
+        
+        st.success("✅ Logged out successfully!")
+        time.sleep(1)
         st.rerun()
+    
     st.markdown("---")
 
     st.markdown("## 🛡️ Control Panel")
