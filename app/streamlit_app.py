@@ -99,66 +99,6 @@ def init_session_state():
 
 init_session_state()
 
-# ============================================================================
-# SESSION MANAGER (Replaces Cookies for Session Management)
-# ============================================================================
-
-def get_session_user():
-    """Get user from session (cleared on browser close)"""
-    return st.session_state.get('_session_user', None)
-
-def set_session_user(email):
-    """Set user in session (cleared on browser close)"""
-    st.session_state['_session_user'] = email
-
-def clear_session_user():
-    """Clear user from session (user is logged out)"""
-    if '_session_user' in st.session_state:
-        del st.session_state['_session_user']
-
-def should_persist_login():
-    """Check if user enabled 'Remember Me' for multi-day persistence"""
-    return st.session_state.get('_persist_login', False)
-
-def set_persist_login(persist):
-    """Set whether to use cookies for persistence"""
-    st.session_state['_persist_login'] = persist
-
-# ============================================================================
-# SESSION & COOKIE INITIALIZATION
-# ============================================================================
-cookie_controller = CookieController()
-
-# Initialize the persist login flag based on existing cookie
-if '_persist_login' not in st.session_state:
-    try:
-        saved_email = cookie_controller.get('user_email')
-        if saved_email:
-            # Cookie exists, so user must have had Remember Me enabled
-            st.session_state._persist_login = True
-        else:
-            st.session_state._persist_login = False
-    except KeyError:
-        st.session_state._persist_login = False
-
-# Check if user has a valid session
-if st.session_state.user_email is None:
-    session_user = get_session_user()
-    
-    if session_user:
-        # User has an active session (browser still open)
-        st.session_state.user_email = session_user
-    else:
-        # No session - check if "Remember Me" is enabled with persistent cookie
-        if st.session_state.get('_persist_login', False):  # ✅ CHANGED THIS LINE
-            try:
-                saved_email = cookie_controller.get('user_email')
-                if saved_email:
-                    st.session_state.user_email = saved_email
-                    set_session_user(saved_email)  # Restore to session
-            except KeyError:
-                pass  # No cookie or expired
-
 
 def hash_password(password):
     """Securely hash the password before saving/checking."""
@@ -166,7 +106,7 @@ def hash_password(password):
 
 
 def is_valid_gmail(email):
-    """Format Validation: Ensure it is a valid Gmail address to prevent infinite accounts."""
+    """Format Validation: Ensure it is a valid Gmail address."""
     pattern = r"^[a-zA-Z0-9_.+-]+@gmail\.com$"
     return re.match(pattern, email)
 
@@ -236,46 +176,38 @@ if st.session_state.user_email is None:
                 "Password", type="password", max_chars=128, key="log_pass"
             )
 
-            # UI Elements for better UX
-            c1, c2 = st.columns(2)
-            with c1:
-                remember_me = st.checkbox(
-                    "Remember Me", key="remember_me_checkbox"
-                )  # <--- Capturing this toggle
-            with c2:
-                with st.popover("Forgot Password?"):
-                    st.markdown("**Reset Your Password**")
-                    rec_email = st.text_input(
-                        "Confirm your Gmail Address", key="rec_email"
-                    )
-                    new_pass = st.text_input(
-                        "Enter New Password", type="password", key="new_pass"
-                    )
-                    if st.button("Update Password", key="rec_btn", type="primary"):
-                        if rec_email and new_pass and supabase:
-                            clean_rec_email = rec_email.strip().lower()
-                            # Check if email exists
-                            res = (
-                                supabase.table("app_users")
-                                .select("email")
-                                .eq("email", clean_rec_email)
-                                .execute()
-                            )
-                            if len(res.data) > 0:
-                                if len(new_pass) >= 8:
-                                    # Update password
-                                    supabase.table("app_users").update(
-                                        {"password_hash": hash_password(new_pass)}
-                                    ).eq("email", clean_rec_email).execute()
-                                    st.success(
-                                        "✅ Password updated successfully! You can now log in."
-                                    )
-                                else:
-                                    st.error("Password must be at least 8 characters.")
+            # Forgot Password
+            with st.popover("Forgot Password?"):
+                st.markdown("**Reset Your Password**")
+                rec_email = st.text_input(
+                    "Confirm your Gmail Address", key="rec_email"
+                )
+                new_pass = st.text_input(
+                    "Enter New Password", type="password", key="new_pass"
+                )
+                if st.button("Update Password", key="rec_btn", type="primary"):
+                    if rec_email and new_pass and supabase:
+                        clean_rec_email = rec_email.strip().lower()
+                        res = (
+                            supabase.table("app_users")
+                            .select("email")
+                            .eq("email", clean_rec_email)
+                            .execute()
+                        )
+                        if len(res.data) > 0:
+                            if len(new_pass) >= 8:
+                                supabase.table("app_users").update(
+                                    {"password_hash": hash_password(new_pass)}
+                                ).eq("email", clean_rec_email).execute()
+                                st.success(
+                                    "✅ Password updated successfully! You can now log in."
+                                )
                             else:
-                                st.error("No account found with this email.")
+                                st.error("Password must be at least 8 characters.")
                         else:
-                            st.warning("Please fill all fields.")
+                            st.error("No account found with this email.")
+                    else:
+                        st.warning("Please fill all fields.")
 
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("Log In", use_container_width=True, type="primary"):
@@ -292,40 +224,9 @@ if st.session_state.user_email is None:
                     if len(res.data) > 0:
                         db_hash = res.data[0]["password_hash"]
                         if db_hash == hash_password(log_pass):
-                            # ✅ Login successful
                             st.session_state.user_email = clean_log_email
                             st.session_state.login_attempts = 0
-                            
-                            # Get the Remember Me checkbox value
-                            remember_me_checked = st.session_state.get(
-                                "remember_me_checkbox", False
-                            )
-                            
-                            # Always clear old cookies and session first
-                            try:
-                                cookie_controller.remove("user_email")
-                            except KeyError:
-                                pass
-                            clear_session_user()
-                            
-                            # Set current session (stays until browser closes)
-                            set_session_user(clean_log_email)
-                            
-                            # Only persist to cookie if "Remember Me" is checked
-                            if remember_me_checked:
-                                cookie_controller.set(
-                                    "user_email", clean_log_email, max_age=30 * 86400
-                                )
-                                set_persist_login(True)
-                                st.success(
-                                    "✅ Login successful! You'll stay logged in for 30 days."
-                                )
-                            else:
-                                set_persist_login(False)
-                                st.success(
-                                    "✅ Login successful! You'll be logged out when you close your browser."
-                                )
-                            
+                            st.success("✅ Login successful!")
                             time.sleep(1)
                             st.rerun()
                         else:
@@ -367,7 +268,6 @@ if st.session_state.user_email is None:
                 if not reg_email or not reg_pass:
                     st.warning("Please fill all fields.")
                 else:
-                    # Clean the email (remove spaces and make lowercase)
                     clean_reg_email = reg_email.strip().lower()
 
                     if not is_valid_gmail(clean_reg_email):
@@ -398,7 +298,7 @@ if st.session_state.user_email is None:
                                 "✅ Account securely created! You can now log in."
                             )
 
-    st.stop()  # <--- HALTS SCRIPT HERE IF NOT LOGGED IN
+    st.stop()
 
 
 def log_anomaly_to_db(event, prediction, explanation=None, event_type="unknown"):
@@ -414,7 +314,7 @@ def log_anomaly_to_db(event, prediction, explanation=None, event_type="unknown")
         memory_mb = raw.get("memory_mb", event["features"].get("memory_mb", 0.0))
 
         data = {
-            "email": st.session_state.user_email,  # <--- Links to logged-in user
+            "email": st.session_state.user_email,
             "is_anomaly": True,
             "anomaly_score": prediction["anomaly_score_pct"],
             "severity": prediction["severity"],
@@ -476,27 +376,13 @@ with st.sidebar:
     st.markdown(f"### 👤 Logged in as:")
     st.caption(f"**{st.session_state.user_email}**")
 
-    if st.button("🚪 Secure Logout", use_container_width=True):
-        # ✅ Clear EVERYTHING
+    if st.button("🚪 Logout", use_container_width=True):
         st.session_state.user_email = None
         st.session_state.history = []
         st.session_state.current_result = None
         st.session_state.current_event = None
         st.session_state.current_explanation = None
         st.session_state.auto_generate = False
-        
-        # Clear session
-        clear_session_user()
-        set_persist_login(False)
-        
-        # Clear cookies
-        try:
-            cookie_controller.remove("user_email")
-        except KeyError:
-            pass
-        
-        st.success("✅ Logged out successfully!")
-        time.sleep(1)
         st.rerun()
     
     st.markdown("---")
