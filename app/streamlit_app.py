@@ -129,6 +129,18 @@ def set_persist_login(persist):
 # ============================================================================
 cookie_controller = CookieController()
 
+# Initialize the persist login flag based on existing cookie
+if '_persist_login' not in st.session_state:
+    try:
+        saved_email = cookie_controller.get('user_email')
+        if saved_email:
+            # Cookie exists, so user must have had Remember Me enabled
+            st.session_state._persist_login = True
+        else:
+            st.session_state._persist_login = False
+    except KeyError:
+        st.session_state._persist_login = False
+
 # Check if user has a valid session
 if st.session_state.user_email is None:
     session_user = get_session_user()
@@ -137,7 +149,7 @@ if st.session_state.user_email is None:
         # User has an active session (browser still open)
         st.session_state.user_email = session_user
     else:
-        # No session - check if user enabled "Remember Me" with persistent cookie
+        # No session - check if "Remember Me" is enabled with persistent cookie
         if should_persist_login():
             try:
                 saved_email = cookie_controller.get('user_email')
