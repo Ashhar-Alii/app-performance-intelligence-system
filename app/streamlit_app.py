@@ -103,32 +103,26 @@ init_session_state()
 # SESSION MANAGER (Replaces Cookies for Session Management)
 # ============================================================================
 
-
 def get_session_user():
     """Get user from session (cleared on browser close)"""
-    return st.session_state.get("_session_user", None)
-
+    return st.session_state.get('_session_user', None)
 
 def set_session_user(email):
     """Set user in session (cleared on browser close)"""
-    st.session_state["_session_user"] = email
-
+    st.session_state['_session_user'] = email
 
 def clear_session_user():
     """Clear user from session (user is logged out)"""
-    if "_session_user" in st.session_state:
-        del st.session_state["_session_user"]
-
+    if '_session_user' in st.session_state:
+        del st.session_state['_session_user']
 
 def should_persist_login():
     """Check if user enabled 'Remember Me' for multi-day persistence"""
-    return st.session_state.get("_persist_login", False)
-
+    return st.session_state.get('_persist_login', False)
 
 def set_persist_login(persist):
     """Set whether to use cookies for persistence"""
-    st.session_state["_persist_login"] = persist
-
+    st.session_state['_persist_login'] = persist
 
 # ============================================================================
 # SESSION & COOKIE INITIALIZATION
@@ -136,9 +130,9 @@ def set_persist_login(persist):
 cookie_controller = CookieController()
 
 # Initialize the persist login flag based on existing cookie
-if "_persist_login" not in st.session_state:
+if '_persist_login' not in st.session_state:
     try:
-        saved_email = cookie_controller.get("user_email")
+        saved_email = cookie_controller.get('user_email')
         if saved_email:
             # Cookie exists, so user must have had Remember Me enabled
             st.session_state._persist_login = True
@@ -150,15 +144,15 @@ if "_persist_login" not in st.session_state:
 # Check if user has a valid session
 if st.session_state.user_email is None:
     session_user = get_session_user()
-
+    
     if session_user:
         # User has an active session (browser still open)
         st.session_state.user_email = session_user
     else:
         # No session - check if "Remember Me" is enabled with persistent cookie
-        if should_persist_login():
+        if st.session_state.get('_persist_login', False):  # ✅ CHANGED THIS LINE
             try:
-                saved_email = cookie_controller.get("user_email")
+                saved_email = cookie_controller.get('user_email')
                 if saved_email:
                     st.session_state.user_email = saved_email
                     set_session_user(saved_email)  # Restore to session
@@ -301,22 +295,22 @@ if st.session_state.user_email is None:
                             # ✅ Login successful
                             st.session_state.user_email = clean_log_email
                             st.session_state.login_attempts = 0
-
+                            
                             # Get the Remember Me checkbox value
                             remember_me_checked = st.session_state.get(
                                 "remember_me_checkbox", False
                             )
-
+                            
                             # Always clear old cookies and session first
                             try:
                                 cookie_controller.remove("user_email")
                             except KeyError:
                                 pass
                             clear_session_user()
-
+                            
                             # Set current session (stays until browser closes)
                             set_session_user(clean_log_email)
-
+                            
                             # Only persist to cookie if "Remember Me" is checked
                             if remember_me_checked:
                                 cookie_controller.set(
@@ -331,7 +325,7 @@ if st.session_state.user_email is None:
                                 st.success(
                                     "✅ Login successful! You'll be logged out when you close your browser."
                                 )
-
+                            
                             time.sleep(1)
                             st.rerun()
                         else:
@@ -490,50 +484,22 @@ with st.sidebar:
         st.session_state.current_event = None
         st.session_state.current_explanation = None
         st.session_state.auto_generate = False
-
+        
         # Clear session
         clear_session_user()
         set_persist_login(False)
-
+        
         # Clear cookies
         try:
             cookie_controller.remove("user_email")
         except KeyError:
             pass
-
+        
         st.success("✅ Logged out successfully!")
         time.sleep(1)
         st.rerun()
-
-    # ✅ ADD THIS DEBUG SECTION
+    
     st.markdown("---")
-    st.markdown("### 🧪 DEBUG: Remember Me Status")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write(
-            f"**_persist_login:** {st.session_state.get('_persist_login', 'NOT SET')}"
-        )
-    with col2:
-        st.write(
-            f"**_session_user:** {st.session_state.get('_session_user', 'NOT SET')}"
-        )
-
-    try:
-        cookie_val = cookie_controller.get("user_email")
-        st.write(f"**Cookie exists:** {cookie_val}")
-    except KeyError:
-        st.write(f"**Cookie exists:** NO")
-
-    st.markdown("---")
-
-    st.markdown("## 🛡️ Control Panel")
-    st.markdown("---")
-
-    st.markdown("### 🎲 Data Generation")
-    gen_mode = st.radio("Generation Mode", ["Single Event", "Batch (50 events)"])
-
-    # ... rest of sidebar code ...
 
     st.markdown("## 🛡️ Control Panel")
     st.markdown("---")
