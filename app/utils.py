@@ -234,59 +234,56 @@ def inject_custom_css():
 
 def engineer_features_from_raw_df(raw_df, baseline_stats, selected_features):
     """
-    Takes a raw DataFrame with basic columns and engineers the 29 features
-    required by the ML model.
-
-    Args:
-        raw_df (pd.DataFrame): DataFrame with raw columns (e.g., 'api_latency_ms').
-        baseline_stats (dict): Dictionary containing the mean and std from the training data.
-        selected_features (list): The exact list of 29 feature names the model was trained on.
-
-    Returns:
-        pd.DataFrame: A new DataFrame with the 29 engineered features.
+    Engineers the exact 29 features the model was trained on,
+    derived from the 5 raw metric columns in the uploaded CSV.
+    Matches the feature names from baseline_stats.pkl exactly.
     """
+    import numpy as np
+    import pandas as pd
+
     df = raw_df.copy()
-    
-    # Define the core raw features we expect
-    raw_cols = ['api_latency_ms', 'fps', 'memory_mb', 'error_count', 'ui_response_ms']
-    
-    # 1. Rolling Window Features
-    windows = [7, 14, 21]
-    for col in raw_cols:
-        if col in df.columns:
-            for w in windows:
-                df[f'{col}_rolling_mean_{w}'] = df[col].rolling(window=w, min_periods=1).mean()
-                df[f'{col}_rolling_std_{w}'] = df[col].rolling(window=w, min_periods=1).std()
-                df[f'{col}_rolling_max_{w}'] = df[col].rolling(window=w, min_periods=1).max()
 
-    # 2. Change Rate Features
-    for col in raw_cols:
-        if col in df.columns:
-            df[f'{col}_change_rate'] = df[col].pct_change(fill_method=None).fillna(0)
-    
-    # 3. Z-Score Features (using baseline stats from training)
-    for col in raw_cols:
-        if col in df.columns and col in baseline_stats['mean']:
-            mean = baseline_stats['mean'][col]
-            std = baseline_stats['std'][col]
-            # Avoid division by zero if a column had zero variance in training
-            if std > 0:
-                df[f'{col}_z_score'] = (df[col] - mean) / std
-            else:
-                df[f'{col}_z_score'] = 0
+    # ── Rolling stats (window=5, max window=10) ──────────────────────────────
+    for col in ['api_latency_ms', 'ui_response_ms', 'fps', 'memory_mb']:
+        df[f'{col}_rolling_mean_5'] = (
+            df[col].rolling(window=5, min_periods=1).mean()
+        )
+        df[f'{col}_rolling_std_5'] = (
+            df[col].rolling(window=5, min_periods=1).std().fillna(0)
+        )
+        df[f'{col}_rolling_max_10'] = (
+            df[col].rolling(window=10, min_periods=1).max()
+        )
 
-    # Fill any remaining NaNs that might have been created by rolling std on small periods
-    df.fillna(0, inplace=True)
-    
-    # Create a new DataFrame with all possible engineered features
-    # and then select only the ones the model was trained on.
-    
-    # Create columns for all selected_features if they don't exist, and fill with 0
-    for feature in selected_features:
-        if feature not in df.columns:
-            df[feature] = 0.0
-            
-    # Ensure the final DataFrame has the exact same columns in the exact same order
-    engineered_df = df[selected_features]
-    
-    return engineered_df
+    # ── Z-scores (computed from this file's own distribution) ────────────────
+    for col in ['api_latency_ms', 'ui_response_ms', 'fps', 'memory_mb']:
+        mean = df[col].mean()
+        std  = df[col].std()
+        std  = std if std > 0 else 1e-8
+        df[f'{col}_zscore'] = (df[col] - mean) / std
+
+    # ── Rate features ─────────────────────────────────────────────────────────
+    df['fps_change_rate']    = df['fps'].diff().fillna(0)
+    df['latency_change_rate'] = df['api_latency_ms'].diff().fillna(0)
+    df['memory_growth_rate'] = df['memory_mb'].diff().fillna(0)
+
+    # ── Error count & latency CV ──────────────────────────────────────────────
+    df['recent_error_count'] = (
+        df['error_count'].rolling(window=5, min_periods=1).sum()
+    )
+    rolling_mean = df['api_latency_ms'].rolling(window=5, min_periods=1).mean()
+    rolling_std  = df['api_latency_ms'].rolling(window=5, min_periods=1).std().fillna(0)
+    df['latency_cv'] = rolling_std / (rolling_mean + 1e-8)
+
+    # ── Categorical placeholders (model saw these during training) ────────────
+    df['app_version']  = 0.0
+    df['screen_name']  = 0.0
+    df['error_code']   = 0.0
+    df['network_type'] = 0.0
+
+    # ── Return only the 29 columns the model expects, in exact order ──────────
+    for f in selected_features:
+        if f not in df.columns:
+            df[f] = 0.0
+
+    return df[selected_features]
