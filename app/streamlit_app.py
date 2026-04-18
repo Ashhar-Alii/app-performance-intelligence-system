@@ -936,6 +936,11 @@ with tab_live:
         if len(st.session_state.history) > 5:
             st.markdown("---")
             st.markdown("### 🔬 Model Verification ")
+            st.caption(
+            "Ground truth labels are available here because the data generator explicitly "
+            "marks each event as normal or anomalous. In a real production system, these "
+            "labels would come from engineer-confirmed incident reports."
+            )
             st.markdown(
                 "*This section proves the model is genuinely detecting anomalies, not randomly guessing.*"
             )
