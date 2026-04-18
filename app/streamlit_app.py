@@ -26,9 +26,6 @@ import hashlib
 import re
 from datetime import datetime, timedelta
 
-# --- NEW: Import Cookie Controller ---
-from streamlit_cookies_controller import CookieController
-
 # ─────────────────────────────────────────
 # Path setup
 # ─────────────────────────────────────────
@@ -41,6 +38,7 @@ from app.utils import (
     get_severity_icon,
     get_display_name,
     SEVERITY_CONFIG,
+    engineer_features_from_raw_df,  # NEW: for on-the-fly CSV feature engineering
 )
 from app.anomaly_detector import AppAnomalyDetector, LiveDataGenerator
 from app.dashboard import (
@@ -384,7 +382,7 @@ with st.sidebar:
         st.session_state.current_explanation = None
         st.session_state.auto_generate = False
         st.rerun()
-    
+
     st.markdown("---")
 
     st.markdown("## 🛡️ Control Panel")
@@ -422,14 +420,39 @@ with st.sidebar:
     st.session_state.auto_generate = auto_generate
 
     st.markdown("---")
+
+    # ── UPGRADED CSV UPLOAD SECTION ──────────────────────────────────────────
     st.markdown("### 📁 Upload Your App Data")
-    uploaded_csv = st.file_uploader("Upload CSV to analyze", type=["csv"])
+
+    st.info(
+        "Your CSV must contain these raw metric columns: "
+        "`api_latency_ms`, `fps`, `memory_mb`, `error_count`, `ui_response_ms`"
+    )
+
+    # Sample CSV template download
+    sample_csv_data = (
+        "api_latency_ms,fps,memory_mb,error_count,ui_response_ms\n"
+        "120,59,250,0,80\n"
+        "135,58,255,0,85\n"
+        "800,55,260,1,150\n"
+        "140,59,265,0,90\n"
+    )
+    st.download_button(
+        label="📥 Download Sample CSV",
+        data=sample_csv_data,
+        file_name="sample_telemetry_template.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+    uploaded_csv = st.file_uploader("Upload your file here", type=["csv"])
 
     if uploaded_csv is not None:
         st.session_state.uploaded_csv = uploaded_csv
         st.success("✅ CSV uploaded! Click 'Analyze CSV' below.")
         if st.button("🔍 Analyze CSV", use_container_width=True, type="primary"):
             st.session_state.analyze_csv = True
+    # ─────────────────────────────────────────────────────────────────────────
 
     st.markdown("---")
     if st.button("🗑️ Clear History", use_container_width=True):
@@ -504,74 +527,80 @@ with st.sidebar:
 
 
 # ============================================================================
-# GENERATE DATA (when button clicked or auto-generate)
+# UPGRADED CSV ANALYSIS LOGIC
 # ============================================================================
 if st.session_state.get("analyze_csv") and st.session_state.get("uploaded_csv"):
     st.session_state.analyze_csv = False
     try:
-        df_upload = pd.read_csv(st.session_state.uploaded_csv)
-        st.markdown("### 📁 CSV Analysis Results")
-        st.caption(f"Analyzing {len(df_upload)} rows from your uploaded file...")
+        raw_df_upload = pd.read_csv(st.session_state.uploaded_csv)
 
-        csv_results = []
-        for _, row in df_upload.iterrows():
-            row_dict = row.to_dict()
-            features = {
-                k: float(v)
-                for k, v in row_dict.items()
-                if k in detector.selected_features
-            }
-            if len(features) < 3:
-                st.warning(
-                    "⚠️ CSV columns don't match model features. Make sure your CSV has the right column names."
+        # Validate required columns
+        REQUIRED_COLS = ["api_latency_ms", "fps", "memory_mb", "error_count", "ui_response_ms"]
+        if not all(col in raw_df_upload.columns for col in REQUIRED_COLS):
+            st.error(
+                f"❌ Invalid CSV Format. Please make sure your file includes all required columns: "
+                f"{', '.join(REQUIRED_COLS)}"
+            )
+        else:
+            with st.spinner("Engineering features from your raw data..."):
+                engineered_df = engineer_features_from_raw_df(
+                    raw_df_upload, detector.baseline_stats, detector.selected_features
                 )
-                break
-            for f in detector.selected_features:
-                if f not in features:
-                    features[f] = 0.0
 
-            pred = detector.predict(features)
+            st.markdown("### 📁 CSV Analysis Results")
+            st.caption(f"Analyzing {len(raw_df_upload)} rows from your uploaded file...")
 
-            if pred["is_anomaly"]:
-                mock_event = {
-                    "features": features,
-                    "raw_display": features,
-                    "anomaly_type": "csv_upload",
-                }
-                log_anomaly_to_db(mock_event, pred, event_type="csv_upload")
+            csv_results = []
+            for idx, engineered_features_row in engineered_df.iterrows():
+                features_dict = engineered_features_row.to_dict()
+                pred = detector.predict(features_dict)
 
-            csv_results.append(
-                {
-                    "Row": _ + 1,
-                    "Status": "🔴 Anomaly" if pred["is_anomaly"] else "🟢 Normal",
-                    "Score (%)": f"{pred['anomaly_score_pct']:.1f}%",
-                    "Severity": pred["severity"],
-                    "Top Trigger": pred["top_trigger"],
-                }
-            )
+                if pred["is_anomaly"]:
+                    raw_values_for_row = raw_df_upload.iloc[idx].to_dict()
+                    mock_event = {
+                        "features": features_dict,
+                        "raw_display": raw_values_for_row,
+                        "anomaly_type": "csv_upload",
+                    }
+                    log_anomaly_to_db(mock_event, pred, event_type="csv_upload")
 
-        if csv_results:
-            results_df = pd.DataFrame(csv_results)
-            total = len(results_df)
-            anomalies = sum(1 for r in csv_results if "Anomaly" in r["Status"])
+                csv_results.append(
+                    {
+                        "Row": idx + 1,
+                        "Status": "🔴 Anomaly" if pred["is_anomaly"] else "🟢 Normal",
+                        "Score (%)": f"{pred['anomaly_score_pct']:.1f}%",
+                        "Severity": pred["severity"],
+                        "Top Trigger": pred["top_trigger"],
+                    }
+                )
 
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Total Rows", total)
-            c2.metric("🔴 Anomalies Found", anomalies)
-            c3.metric("Anomaly Rate", f"{anomalies/total*100:.1f}%")
+            if csv_results:
+                results_df = pd.DataFrame(csv_results)
+                total = len(results_df)
+                anomalies = sum(1 for r in csv_results if "Anomaly" in r["Status"])
 
-            st.dataframe(results_df, use_container_width=True, hide_index=True)
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Total Rows Processed", total)
+                c2.metric("🔴 Anomalies Found (Saved to DB)", anomalies)
+                c3.metric("Anomaly Rate", f"{anomalies/total*100:.1f}%")
 
-            st.download_button(
-                label="📥 Download Results CSV",
-                data=results_df.to_csv(index=False),
-                file_name="csv_analysis_results.csv",
-                mime="text/csv",
-                use_container_width=True,
-            )
+                st.dataframe(results_df, use_container_width=True, hide_index=True)
+
+                st.download_button(
+                    label="📥 Download Results CSV",
+                    data=results_df.to_csv(index=False),
+                    file_name="csv_analysis_results.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                )
+
     except Exception as e:
-        st.error(f"❌ Error analyzing CSV: {e}")
+        st.error(f"❌ An error occurred during CSV processing: {e}")
 
+
+# ============================================================================
+# GENERATE DATA (when button clicked or auto-generate)
+# ============================================================================
 should_generate = generate_clicked or st.session_state.auto_generate
 
 if should_generate:
