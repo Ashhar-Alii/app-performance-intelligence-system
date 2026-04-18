@@ -177,9 +177,7 @@ if st.session_state.user_email is None:
             # Forgot Password
             with st.popover("Forgot Password?"):
                 st.markdown("**Reset Your Password**")
-                rec_email = st.text_input(
-                    "Confirm your Gmail Address", key="rec_email"
-                )
+                rec_email = st.text_input("Confirm your Gmail Address", key="rec_email")
                 new_pass = st.text_input(
                     "Enter New Password", type="password", key="new_pass"
                 )
@@ -527,76 +525,88 @@ with st.sidebar:
 
 
 # ============================================================================
-# UPGRADED CSV ANALYSIS LOGIC
+# CSV ANALYSIS LOGIC
 # ============================================================================
+csv_analysis_results = None  # will be rendered inside tab_live below
+
 if st.session_state.get("analyze_csv") and st.session_state.get("uploaded_csv"):
     st.session_state.analyze_csv = False
     try:
         raw_df_upload = pd.read_csv(st.session_state.uploaded_csv)
 
-        # Validate required columns
-        REQUIRED_COLS = ["api_latency_ms", "fps", "memory_mb", "error_count", "ui_response_ms"]
+        REQUIRED_COLS = [
+            "api_latency_ms",
+            "fps",
+            "memory_mb",
+            "error_count",
+            "ui_response_ms",
+        ]
         if not all(col in raw_df_upload.columns for col in REQUIRED_COLS):
-            st.error(
-                f"❌ Invalid CSV Format. Please make sure your file includes all required columns: "
-                f"{', '.join(REQUIRED_COLS)}"
+            st.session_state.csv_error = (
+                f"❌ Invalid CSV. Required columns: {', '.join(REQUIRED_COLS)}"
             )
         else:
+            # Need enough rows for reliable z-scores — pad if too small
+            if len(raw_df_upload) < 50:
+                # Repeat the data to get stable rolling/zscore calculations
+                repeat_times = (50 // len(raw_df_upload)) + 1
+                df_padded = pd.concat([raw_df_upload] * repeat_times, ignore_index=True)
+            else:
+                df_padded = raw_df_upload.copy()
+
             with st.spinner("Engineering features from your raw data..."):
                 engineered_df = engineer_features_from_raw_df(
-                    raw_df_upload, detector.baseline_stats, detector.selected_features
+                    df_padded, detector.baseline_stats, detector.selected_features
                 )
 
-            st.markdown("### 📁 CSV Analysis Results")
-            st.caption(f"Analyzing {len(raw_df_upload)} rows from your uploaded file...")
+            # Only score the original rows (not the padding)
+            engineered_df = engineered_df.iloc[: len(raw_df_upload)].reset_index(
+                drop=True
+            )
 
             csv_results = []
-            for idx, engineered_features_row in engineered_df.iterrows():
-                features_dict = engineered_features_row.to_dict()
+            explainer = st.session_state.explainer
+
+            for idx in range(len(raw_df_upload)):
+                features_dict = engineered_df.iloc[idx].to_dict()
                 pred = detector.predict(features_dict)
 
+                # Get AI explanation for anomalies
+                explanation = None
                 if pred["is_anomaly"]:
-                    raw_values_for_row = raw_df_upload.iloc[idx].to_dict()
+                    raw_vals = raw_df_upload.iloc[idx].to_dict()
                     mock_event = {
                         "features": features_dict,
-                        "raw_display": raw_values_for_row,
+                        "raw_display": raw_vals,
                         "anomaly_type": "csv_upload",
+                        "is_generated_anomaly": True,
+                        "timestamp": datetime.now().isoformat(),
                     }
-                    log_anomaly_to_db(mock_event, pred, event_type="csv_upload")
+                    explanation = explainer.explain(pred, mock_event, use_llm=False)
+                    log_anomaly_to_db(
+                        mock_event, pred, explanation, event_type="csv_upload"
+                    )
 
                 csv_results.append(
                     {
-                        "Row": idx + 1,
+                        "row_num": idx + 1,
                         "Status": "🔴 Anomaly" if pred["is_anomaly"] else "🟢 Normal",
                         "Score (%)": f"{pred['anomaly_score_pct']:.1f}%",
                         "Severity": pred["severity"],
                         "Top Trigger": pred["top_trigger"],
+                        "is_anomaly": pred["is_anomaly"],
+                        "pred": pred,
+                        "explanation": explanation,
+                        "raw": raw_df_upload.iloc[idx].to_dict(),
                     }
                 )
 
-            if csv_results:
-                results_df = pd.DataFrame(csv_results)
-                total = len(results_df)
-                anomalies = sum(1 for r in csv_results if "Anomaly" in r["Status"])
-
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Total Rows Processed", total)
-                c2.metric("🔴 Anomalies Found (Saved to DB)", anomalies)
-                c3.metric("Anomaly Rate", f"{anomalies/total*100:.1f}%")
-
-                st.dataframe(results_df, use_container_width=True, hide_index=True)
-
-                st.download_button(
-                    label="📥 Download Results CSV",
-                    data=results_df.to_csv(index=False),
-                    file_name="csv_analysis_results.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                )
+            st.session_state.csv_analysis_results = csv_results
+            st.session_state.csv_error = None
 
     except Exception as e:
-        st.error(f"❌ An error occurred during CSV processing: {e}")
-
+        st.session_state.csv_error = f"❌ An error occurred during CSV processing: {e}"
+        st.session_state.csv_analysis_results = None
 
 # ============================================================================
 # GENERATE DATA (when button clicked or auto-generate)
@@ -1046,6 +1056,73 @@ with tab_live:
                         f"""<div style="background: #1E3A5F; padding: 1rem; border-radius: 8px;"><b style="color: white; font-size: 1rem;">📊 Score Analysis:</b><br><span style="color: #A8C8E8;">• Average score for Normal events: </span><b style="color: #69DB7C;">{avg_normal:.1f}%</b><br><span style="color: #A8C8E8;">• Average score for Anomaly events: </span><b style="color: #FF6B6B;">{avg_anomaly:.1f}%</b><br><span style="color: #A8C8E8;">• Score gap: </span><b style="color: white;">{abs(avg_anomaly - avg_normal):.1f}% {'✅ Good separation!' if abs(avg_anomaly - avg_normal) > 15 else '⚠️ Moderate separation'}</b></div>""",
                         unsafe_allow_html=True,
                     )
+
+        # ── CSV Analysis Results (rendered inside tab) ──────────────────────
+        if st.session_state.get("csv_error"):
+            st.error(st.session_state.csv_error)
+
+        if st.session_state.get("csv_analysis_results"):
+            csv_results = st.session_state.csv_analysis_results
+            st.markdown("---")
+            st.markdown("### 📁 CSV Analysis Results")
+
+            total = len(csv_results)
+            anomalies = sum(1 for r in csv_results if r["is_anomaly"])
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Total Rows Processed", total)
+            c2.metric("🔴 Anomalies Found", anomalies)
+            c3.metric("Anomaly Rate", f"{anomalies/total*100:.1f}%")
+
+            # Summary table
+            table_df = pd.DataFrame(
+                [
+                    {
+                        "Row": r["row_num"],
+                        "Status": r["Status"],
+                        "Score (%)": r["Score (%)"],
+                        "Severity": r["Severity"],
+                        "Top Trigger": r["Top Trigger"],
+                    }
+                    for r in csv_results
+                ]
+            )
+            st.dataframe(table_df, use_container_width=True, hide_index=True)
+
+            # Download results
+            st.download_button(
+                label="📥 Download Results CSV",
+                data=table_df.to_csv(index=False),
+                file_name="csv_analysis_results.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+
+            # Per-anomaly AI explanation expanders
+            anomaly_rows = [r for r in csv_results if r["is_anomaly"]]
+            if anomaly_rows:
+                st.markdown("### 🔍 Anomaly Details & AI Insights")
+                for r in anomaly_rows:
+                    with st.expander(
+                        f"Row {r['row_num']} — {r['Severity']} | Score: {r['Score (%)']} | Trigger: {r['Top Trigger']}"
+                    ):
+                        # Raw metrics
+                        st.markdown("**📊 Raw Metrics**")
+                        raw_cols = st.columns(5)
+                        for i, (k, v) in enumerate(r["raw"].items()):
+                            raw_cols[i % 5].metric(
+                                k, f"{v:.1f}" if isinstance(v, float) else v
+                            )
+
+                        # AI explanation
+                        if r["explanation"]:
+                            exp = r["explanation"]
+                            st.markdown("**🔍 Root Cause**")
+                            st.markdown(f"> {exp.get('root_cause', 'N/A')}")
+                            st.markdown("**💥 User Impact**")
+                            st.markdown(f"> {exp.get('impact', 'N/A')}")
+                            st.markdown("**✅ Recommended Actions**")
+                            st.markdown(exp.get("recommendation", "N/A"))
 
         if st.session_state.history:
             st.markdown("---")
