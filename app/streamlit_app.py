@@ -702,6 +702,62 @@ tab_live, tab_history = st.tabs(["🔴 Live Dashboard", "📈 Historical Databas
 # TAB 1: LIVE DASHBOARD
 # ============================================================================
 with tab_live:
+    if st.session_state.get("csv_error"):
+        st.error(st.session_state.csv_error)
+
+    if st.session_state.get("csv_analysis_results"):
+        csv_results = st.session_state.csv_analysis_results
+        st.markdown("---")
+        st.markdown("### 📁 CSV Analysis Results")
+
+        total = len(csv_results)
+        anomalies = sum(1 for r in csv_results if r["is_anomaly"])
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total Rows Processed", total)
+        c2.metric("🔴 Anomalies Found", anomalies)
+        c3.metric("Anomaly Rate", f"{anomalies/total*100:.1f}%")
+
+        table_df = pd.DataFrame([{
+            "Row": r["row_num"],
+            "Status": r["Status"],
+            "Score (%)": r["Score (%)"],
+            "Severity": r["Severity"],
+            "Top Trigger": r["Top Trigger"],
+        } for r in csv_results])
+        st.dataframe(table_df, use_container_width=True, hide_index=True)
+
+        st.download_button(
+            label="📥 Download Results CSV",
+            data=table_df.to_csv(index=False),
+            file_name="csv_analysis_results.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+        anomaly_rows = [r for r in csv_results if r["is_anomaly"]]
+        if anomaly_rows:
+            st.markdown("### 🔍 Anomaly Details & AI Insights")
+            for r in anomaly_rows:
+                with st.expander(
+                    f"Row {r['row_num']} — {r['Severity']} | "
+                    f"Score: {r['Score (%)']} | Trigger: {r['Top Trigger']}"
+                ):
+                    st.markdown("**📊 Raw Metrics**")
+                    raw_cols = st.columns(5)
+                    for i, (k, v) in enumerate(r["raw"].items()):
+                        raw_cols[i % 5].metric(
+                            k, f"{v:.1f}" if isinstance(v, float) else v
+                        )
+                    if r["explanation"]:
+                        exp = r["explanation"]
+                        st.markdown("**🔍 Root Cause**")
+                        st.markdown(f"> {exp.get('root_cause', 'N/A')}")
+                        st.markdown("**💥 User Impact**")
+                        st.markdown(f"> {exp.get('impact', 'N/A')}")
+                        st.markdown("**✅ Recommended Actions**")
+                        st.markdown(exp.get("recommendation", "N/A"))
+                        
     if st.session_state.current_result:
         render_metrics_row(st.session_state.current_result)
         st.markdown("")
