@@ -1160,32 +1160,6 @@ with tab_live:
                 key="csv_results_download",
             )
 
-            # Per-anomaly AI explanation expanders
-            anomaly_rows = [r for r in csv_results if r["is_anomaly"]]
-            if anomaly_rows:
-                st.markdown("### 🔍 Anomaly Details & AI Insights")
-                for r in anomaly_rows:
-                    with st.expander(
-                        f"Row {r['row_num']} — {r['Severity']} | Score: {r['Score (%)']} | Trigger: {r['Top Trigger']}"
-                    ):
-                        # Raw metrics
-                        st.markdown("**📊 Raw Metrics**")
-                        raw_cols = st.columns(5)
-                        for i, (k, v) in enumerate(r["raw"].items()):
-                            raw_cols[i % 5].metric(
-                                k, f"{v:.1f}" if isinstance(v, float) else v
-                            )
-
-                        # AI explanation
-                        if r["explanation"]:
-                            exp = r["explanation"]
-                            st.markdown("**🔍 Root Cause**")
-                            st.markdown(f"> {exp.get('root_cause', 'N/A')}")
-                            st.markdown("**💥 User Impact**")
-                            st.markdown(f"> {exp.get('impact', 'N/A')}")
-                            st.markdown("**✅ Recommended Actions**")
-                            st.markdown(exp.get("recommendation", "N/A"))
-
         if st.session_state.history:
             st.markdown("---")
             download_data = []
